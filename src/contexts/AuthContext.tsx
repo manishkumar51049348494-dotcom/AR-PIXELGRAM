@@ -74,13 +74,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Retry handles race condition: DB trigger may not have created the profile row yet
-        const p = await getProfileWithRetry(session.user.id, 5, 500);
-        // sirf tab null karo jab sach me signed out ho (neeche else branch)
-        if (p) setProfile(p);
+        const userId = session.user.id;
+        // Supabase auth callback ke andar await karke koi database/auth request
+        // chalane se auth lock deadlock ho sakta hai. Callback ko turant return
+        // karne do aur profile request next task me chalao.
+        setTimeout(() => {
+          getProfileWithRetry(userId, 5, 500)
+            .then((p) => {
+              if (p) setProfile(p);
+            })
+            .catch((e) => console.error('auth profile refresh failed', e));
+        }, 0);
       } else {
         setProfile(null);
       }

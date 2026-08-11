@@ -912,9 +912,13 @@ export async function getReelsFeed(limit = 20, offset = 0): Promise<Reel[]> {
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return (data || []) as Reel[];
-  const userId = user.data.user.id;
+  // Feed ko remote auth verification par depend mat rakho. getUser() network
+  // failure/refresh ke waqt poori reels query ko fail kar deta tha, jabki reel
+  // rows pehle hi aa chuki hoti thin. Local persisted session enough hai for
+  // the optional is_liked lookup; RLS still protects the database query.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return (data || []) as Reel[];
+  const userId = session.user.id;
   const ids = (data || []).map((r) => r.id);
   let likedSet = new Set<string>();
   if (ids.length > 0) {
@@ -939,10 +943,10 @@ export async function getReelById(reelId: string): Promise<Reel | null> {
     .eq('id', reelId)
     .maybeSingle();
   if (error || !data) return null;
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return data as Reel;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return data as Reel;
   const { data: like } = await supabase
-    .from('reel_likes').select('id').eq('reel_id', reelId).eq('user_id', user.data.user.id).maybeSingle();
+    .from('reel_likes').select('id').eq('reel_id', reelId).eq('user_id', session.user.id).maybeSingle();
   return { ...data, is_liked: !!like } as Reel;
 }
 
