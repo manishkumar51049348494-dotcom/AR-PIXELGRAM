@@ -35,6 +35,10 @@ interface CallContextValue extends CallState {
   toggleMinimize: () => void;
   toggleScreenShare: () => Promise<void>;
   toggleRecording: () => Promise<void>;
+  speakerOn: boolean;
+  toggleSpeaker: () => void;
+  facingFront: boolean;
+  flipCamera: () => Promise<void>;
 }
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -63,6 +67,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [minimized, setMinimized] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [facingFront, setFacingFront] = useState(true);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
@@ -148,6 +154,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCameraOff(false);
     setMinimized(false);
     setScreenSharing(false);
+    setSpeakerOn(true);
+    setFacingFront(true);
     if (ringAudioRef.current) { ringAudioRef.current.pause(); ringAudioRef.current = null; }
   }, [localStream, stopInviteRetry]);
 
@@ -395,6 +403,29 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleMinimize = useCallback(() => setMinimized(m => !m), []);
 
+  // Speaker (loud) vs earpiece — the UI applies this to the audio element.
+  const toggleSpeaker = useCallback(() => setSpeakerOn(v => !v), []);
+
+  // Front / back camera switch during a video call.
+  const flipCamera = useCallback(async () => {
+    if (!localStream || screenSharing) return;
+    const next = !facingFront;
+    try {
+      const fresh = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: next ? 'user' : 'environment' }, audio: false,
+      });
+      const newTrack = fresh.getVideoTracks()[0];
+      if (!newTrack) return;
+      newTrack.enabled = !cameraOff;
+      if (videoSenderRef.current) { await videoSenderRef.current.replaceTrack(newTrack); }
+      localStream.getVideoTracks().forEach(t => { try { t.stop(); } catch { /* noop */ } localStream.removeTrack(t); });
+      localStream.addTrack(newTrack);
+      camVideoTrackRef.current = newTrack;
+      setLocalStream(new MediaStream(localStream.getTracks()));
+      setFacingFront(next);
+    } catch (err) { console.error('flip camera failed', err); }
+  }, [localStream, facingFront, cameraOff, screenSharing]);
+
   const toggleScreenShare = useCallback(async () => {
     if (!pcRef.current || !videoSenderRef.current) return;
     try {
@@ -610,7 +641,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     minimized, screenSharing, recording,
     startCall, acceptCall, rejectCall, endCall, toggleMute, toggleCamera,
     toggleMinimize, toggleScreenShare, toggleRecording,
-  }), [state, localStream, remoteStream, muted, cameraOff, minimized, screenSharing, recording, startCall, acceptCall, rejectCall, endCall, toggleMute, toggleCamera, toggleMinimize, toggleScreenShare, toggleRecording]);
+    speakerOn, toggleSpeaker, facingFront, flipCamera,
+  }), [state, localStream, remoteStream, muted, cameraOff, minimized, screenSharing, recording, startCall, acceptCall, rejectCall, endCall, toggleMute, toggleCamera, toggleMinimize, toggleScreenShare, toggleRecording, speakerOn, toggleSpeaker, facingFront, flipCamera]);
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
 };
