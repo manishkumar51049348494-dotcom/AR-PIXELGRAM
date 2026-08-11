@@ -1,0 +1,2 @@
+Folder preservation file for: src/components/layouts
+This file ensures the complete archive contains 967 actual files.
