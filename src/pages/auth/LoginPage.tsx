@@ -21,42 +21,43 @@ const LoginPage: React.FC = () => {
     if (!identifier || !password) { toast.error('Please fill all fields'); return; }
     setLoading(true);
 
-    const looksLikeEmail = identifier.includes('@');
     let data: Awaited<ReturnType<typeof supabase.auth.getUser>>['data'] | null = null;
     let loginError: string | null = null;
 
-    if (looksLikeEmail) {
-      // Already an email — sign in directly, same as before.
+    // Username, signup email, Account Center ka extra email, ya koi bhi verified
+    // phone number — sab server-side resolve hote hain.
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('login-with-identifier', {
+        body: { identifier: identifier.trim(), password },
+      });
+      if (fnError || fnData?.error) {
+        loginError = fnData?.error || 'Invalid login credentials';
+      } else if (fnData?.access_token && fnData?.refresh_token) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: fnData.access_token,
+          refresh_token: fnData.refresh_token,
+        });
+        if (sessionError) loginError = sessionError.message;
+        else data = { user: sessionData.user };
+      } else {
+        loginError = 'Invalid login credentials';
+      }
+    } catch {
+      loginError = null;
+    }
+
+    // Fallback: agar function reachable hi na ho to seedha email login try karo.
+    if (!data?.user && !loginError && identifier.includes('@')) {
       const res = await supabase.auth.signInWithPassword({ email: identifier.trim(), password });
       if (res.error) loginError = res.error.message;
       else data = { user: res.data.user };
-    } else {
-      // Username — resolve to the account's email server-side and sign in.
-      try {
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('login-with-identifier', {
-          body: { identifier: identifier.trim(), password },
-        });
-        if (fnError || fnData?.error) {
-          loginError = fnData?.error || 'Invalid login credentials';
-        } else if (fnData?.access_token && fnData?.refresh_token) {
-          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-            access_token: fnData.access_token,
-            refresh_token: fnData.refresh_token,
-          });
-          if (sessionError) loginError = sessionError.message;
-          else data = { user: sessionData.user };
-        } else {
-          loginError = 'Invalid login credentials';
-        }
-      } catch {
-        loginError = 'Username se login abhi available nahi hai, email se try karo';
-      }
     }
+    if (!data?.user && !loginError) loginError = 'Invalid login credentials';
 
     if (loginError) {
       setLoading(false);
       if (loginError.toLowerCase().includes('invalid')) {
-        toast.error('Wrong username/email or password. If you don\'t have an account, please Sign Up first.');
+        toast.error('Wrong username/email/phone or password. If you don\'t have an account, please Sign Up first.');
       } else {
         toast.error(loginError);
       }
@@ -124,11 +125,11 @@ const LoginPage: React.FC = () => {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="identifier">Username or Email</Label>
+            <Label htmlFor="identifier">Username, Email or Phone</Label>
             <Input
               id="identifier"
               type="text"
-              placeholder="username or you@example.com"
+              placeholder="username, you@example.com or +91…"
               value={identifier}
               onChange={e => setIdentifier(e.target.value)}
               autoComplete="username"
