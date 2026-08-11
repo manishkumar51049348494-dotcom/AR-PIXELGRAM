@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, BellRing, KeyRound } from 'lucide-react';
+import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, BellRing, KeyRound, AtSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
@@ -75,6 +75,7 @@ const SettingsPage: React.FC = () => {
           <h2 className="text-xl font-bold text-foreground mb-5">Help Center</h2>
           <div className="space-y-4">
             {[
+              { q: 'Email ya phone number kaise add karein?', a: 'Settings → Account Center me jaakar email ya number daalein, OTP verify karein. Max 5 email aur 5 number. Verified email/number se wahi password daal kar login bhi ho jayega.' },
               { q: 'How to change my password?', a: 'Go to Settings → Account → Change Password. You\'ll receive a reset email.' },
               { q: 'How to make my account private?', a: 'Go to Edit Profile and toggle "Private Account". Only approved followers can see your posts.' },
               { q: 'How to get verified?', a: 'Submit a verification request with a valid reason. Our team reviews within 3-5 business days.' },
@@ -230,6 +231,7 @@ const SettingsPage: React.FC = () => {
           { icon: BellRing, label: 'Enable Notifications', desc: 'Calls & messages ke alerts', onClick: () => navigate('/settings/notifications'), danger: false },
           { icon: KeyRound, label: 'Change Password', desc: 'OTP se apna password reset karo', onClick: () => navigate('/forgot-password'), danger: false },
           { icon: BadgeCheck, label: 'Request Verification', desc: profile?.is_verified ? 'Already verified ✓' : 'Get the blue badge', onClick: () => setSection('verification'), danger: false },
+          { icon: AtSign, label: 'Account Center', desc: 'Email aur phone number add/manage karein', onClick: () => navigate('/settings/account-center'), danger: false },
           { icon: HelpCircle, label: 'Help Center', desc: 'FAQs and support', onClick: () => setSection('help'), danger: false },
           { icon: Flag, label: 'Report a Problem', desc: "Let us know what's wrong", onClick: () => setSection('report'), danger: false },
           { icon: Shield, label: 'Privacy', desc: 'Manage your privacy settings', onClick: () => navigate('/edit-profile'), danger: false },
