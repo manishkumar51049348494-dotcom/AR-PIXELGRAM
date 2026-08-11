@@ -147,7 +147,9 @@ const ProfilePage: React.FC = () => {
   }
 
   // Network/server problem — account delete nahi hua. Retry dikhao.
-  if (loadError && !profile) {
+  // Apne hi profile par row null aana (network/RLS/trigger race) bhi delete NAHI hai,
+  // isliye owner ko bhi "deleted" ki jagah retry screen dikhao.
+  if (!profile && (loadError || isOwnProfile)) {
     return (
       <MobileLayout>
         <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-6">
