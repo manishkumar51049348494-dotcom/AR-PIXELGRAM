@@ -33,20 +33,48 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Identifier email / phone / username — teeno ho sakta hai. Account Center
+    // me add kiye gaye extra email/number bhi yahin resolve hote hain, taaki
+    // unse bhi wahi password daal kar login ho jaye.
+    const raw = String(identifier).trim();
     let email: string | null = null;
-    if (identifier.includes('@')) {
-      email = identifier.trim();
+    let ownerId: string | null = null;
+
+    const looksLikeEmail = raw.includes('@');
+    const digitsOnly = raw.replace(/[^\d+]/g, '');
+    const looksLikePhone = !looksLikeEmail && /^\+?\d{8,15}$/.test(digitsOnly);
+
+    if (looksLikeEmail) {
+      const normalized = raw.toLowerCase();
+      const { data: idRow } = await admin
+        .from('account_identifiers')
+        .select('user_id')
+        .eq('type', 'email')
+        .eq('value', normalized)
+        .maybeSingle();
+      if (idRow?.user_id) ownerId = idRow.user_id;
+      else email = normalized; // purane accounts jinka identifier row nahi bana
+    } else if (looksLikePhone) {
+      const e164 = digitsOnly.startsWith('+') ? digitsOnly : `+${digitsOnly}`;
+      const { data: idRow } = await admin
+        .from('account_identifiers')
+        .select('user_id')
+        .eq('type', 'phone')
+        .eq('value', e164)
+        .maybeSingle();
+      if (idRow?.user_id) ownerId = idRow.user_id;
     } else {
-      // Username → find the owning account, then look up its email.
       const { data: profile } = await admin
         .from('profiles')
         .select('user_id')
-        .ilike('username', identifier.trim())
+        .ilike('username', raw)
         .maybeSingle();
-      if (profile?.user_id) {
-        const { data: userData } = await admin.auth.admin.getUserById(profile.user_id);
-        email = userData?.user?.email ?? null;
-      }
+      if (profile?.user_id) ownerId = profile.user_id;
+    }
+
+    if (!email && ownerId) {
+      const { data: userData } = await admin.auth.admin.getUserById(ownerId);
+      email = userData?.user?.email ?? null;
     }
 
     if (!email) {
