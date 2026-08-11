@@ -74,7 +74,11 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
   // While auth is loading AND on a protected route → show neutral splash, not page content
   // This prevents unauthenticated users from seeing reels/home loading screen
-  if (!isReady && !isPublic) {
+  // Also never render protected content when there is no signed-in user:
+  // the redirect below runs in an effect (one paint later), which is what let
+  // unauthenticated visitors briefly land on the reels feed and get stuck on
+  // its loading screen.
+  if (!isPublic && (!isReady || !user)) {
     return (
       <div className="h-[100dvh] w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
