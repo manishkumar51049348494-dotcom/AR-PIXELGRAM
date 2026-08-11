@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layouts/MobileLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { withTimeout } from '@/lib/withTimeout';
 import {
   getFeedStories, createStory, uploadImage, uploadVideo, deleteStory,
   toggleStoryLike, isStoryLiked, getStoryLikers, recordStoryView, sendMessage, createNotification
@@ -49,11 +50,10 @@ const StoriesPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    const timer = setTimeout(() => setLoading(false), 5000);
-    getFeedStories(user.id)
+    withTimeout(getFeedStories(user.id), 20000)
       .then(s => { setStories(s); })
-      .catch(() => {})
-      .finally(() => { clearTimeout(timer); setLoading(false); });
+      .catch((e) => { console.error('stories load failed', e); })
+      .finally(() => { setLoading(false); });
   }, [user]);
 
   // Record view when story is opened + load liked state

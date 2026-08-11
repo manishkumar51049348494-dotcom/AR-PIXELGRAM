@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MobileLayout from '@/components/layouts/MobileLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { withTimeout } from '@/lib/withTimeout';
 import { getMutualFollows, getMessages, getUnreadCount, getMessagedProfiles } from '@/services/api';
 import type { Profile, Message } from '@/types/types';
 import { Link } from 'react-router-dom';
@@ -20,12 +21,11 @@ const ChatListPage: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const timer = setTimeout(() => setLoading(false), 5000);
       try {
-        const [mutuals, messaged] = await Promise.all([
+        const [mutuals, messaged] = await withTimeout(Promise.all([
           getMutualFollows(user.id),
           getMessagedProfiles(user.id),
-        ]);
+        ]), 20000);
         const seen = new Set<string>();
         const combined: Profile[] = [];
         for (const p of [...mutuals, ...messaged]) {
@@ -47,7 +47,7 @@ const ChatListPage: React.FC = () => {
           return new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime();
         }));
       } catch { /* ignore */ }
-      finally { clearTimeout(timer); setLoading(false); }
+      finally { setLoading(false); }
     };
     load();
   }, [user]);

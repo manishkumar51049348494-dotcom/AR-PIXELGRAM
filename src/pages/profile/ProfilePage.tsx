@@ -16,6 +16,7 @@ import { Settings, BadgeCheck, Grid3X3, Lock, Loader2, Film, Camera, Flag, Play,
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import PostCard from '@/components/common/PostCard';
+import { withTimeout } from '@/lib/withTimeout';
 
 // username से unique gradient ring color
 function userGradient(username: string) {
@@ -52,16 +53,19 @@ const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'reels'>('posts');
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     if (!targetUserId) return;
     setLoading(true);
-    const timer = setTimeout(() => setLoading(false), 5000); // 5s max
+    setLoadError(false);
     try {
-      const [p, [fc, fgc]] = await Promise.all([
+      // 5 second ka blind timer hata diya gaya — wo slow network par profile ko
+      // galti se "User not found" bana deta tha. Ab asli timeout + retry hai.
+      const [p, [fc, fgc]] = await withTimeout(Promise.all([
         getProfile(targetUserId),
         Promise.all([getFollowersCount(targetUserId), getFollowingCount(targetUserId)])
-      ]);
+      ]), 20000);
       setProfile(p);
       setFollowersCount(fc);
       setFollowingCount(fgc);
@@ -83,8 +87,11 @@ const ProfilePage: React.FC = () => {
         setPosts(userPosts);
         setReels(userReels);
       }
-    } catch { /* silently ignore, skeleton already shown */ }
-    finally { clearTimeout(timer); setLoading(false); }
+    } catch (e) {
+      console.error('profile load failed', e);
+      setLoadError(true);
+    }
+    finally { setLoading(false); }
   }, [targetUserId, isOwnProfile, user]);
 
   useEffect(() => { load(); }, [load]);
@@ -134,6 +141,26 @@ const ProfilePage: React.FC = () => {
           <div className="grid grid-cols-3 gap-0.5">
             {Array.from({length:9}).map((_,i) => <div key={i} className="aspect-square bg-muted animate-pulse" />)}
           </div>
+        </div>
+      </MobileLayout>
+    );
+  }
+
+  // Network/server problem — account delete nahi hua. Retry dikhao.
+  if (loadError && !profile) {
+    return (
+      <MobileLayout>
+        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-6">
+          <div className="w-20 h-20 rounded-full border-2 border-border flex items-center justify-center mb-4 bg-muted">
+            <Loader2 className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground mb-2">Connection problem</h2>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Profile load nahi ho paaya. Internet check karke dobara try karein.
+          </p>
+          <Button onClick={() => load()} className="mt-5 rounded-xl font-bold px-8 h-11">
+            Retry
+          </Button>
         </div>
       </MobileLayout>
     );

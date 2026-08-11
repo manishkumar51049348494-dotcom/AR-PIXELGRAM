@@ -4,6 +4,7 @@ import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
 import { getProfile } from '@/services/api';
 import { usePushSubscription } from '@/hooks/usePushSubscription';
+import { withTimeout } from '@/lib/withTimeout';
 
 interface AuthContextType {
   user: User | null;
@@ -33,18 +34,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   usePushSubscription(user?.id);
 
   const refreshProfile = useCallback(async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser) {
-      const p = await getProfile(currentUser.id);
-      setProfile(p);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const p = await withTimeout(getProfile(currentUser.id));
+        // Network error par purana profile mat mitao
+        if (p) setProfile(p);
+      }
+    } catch (e) {
+      console.error('refreshProfile failed', e);
     }
   }, []);
 
   // Retry getProfile until the DB trigger creates the row (handles new user race condition)
   const getProfileWithRetry = useCallback(async (userId: string, retries = 5, delayMs = 600): Promise<Profile | null> => {
     for (let i = 0; i < retries; i++) {
-      const p = await getProfile(userId);
-      if (p) return p;
+      try {
+        const p = await withTimeout(getProfile(userId), 15000);
+        if (p) return p;
+      } catch (e) {
+        // network/timeout — agla retry
+        console.error('getProfile failed', e);
+      }
       if (i < retries - 1) await new Promise(res => setTimeout(res, delayMs));
     }
     return null;
@@ -55,8 +66,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       if (session?.user) {
         const p = await getProfileWithRetry(session.user.id);
-        setProfile(p);
+        if (p) setProfile(p);
       }
+      setLoading(false);
+    }).catch((e) => {
+      console.error('getSession failed', e);
       setLoading(false);
     });
 
@@ -65,7 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         // Retry handles race condition: DB trigger may not have created the profile row yet
         const p = await getProfileWithRetry(session.user.id, 5, 500);
-        setProfile(p);
+        // sirf tab null karo jab sach me signed out ho (neeche else branch)
+        if (p) setProfile(p);
       } else {
         setProfile(null);
       }

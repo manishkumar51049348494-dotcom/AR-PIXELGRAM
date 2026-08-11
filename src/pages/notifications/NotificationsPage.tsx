@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MobileLayout from '@/components/layouts/MobileLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { withTimeout } from '@/lib/withTimeout';
 import {
   getNotifications, markNotificationsRead, acceptFollowRequest,
   rejectFollowRequest, getPendingFollowRequests, createNotification
@@ -56,13 +57,12 @@ const NotificationsPage: React.FC = () => {
 
   const load = async () => {
     if (!user) return;
-    const timer = setTimeout(() => setLoading(false), 5000);
     try {
-      const notifs = await getNotifications(user.id);
+      const notifs = await withTimeout(getNotifications(user.id), 20000);
       setNotifications(notifs);
       await markNotificationsRead(user.id);
-    } catch { /* ignore */ }
-    finally { clearTimeout(timer); setLoading(false); }
+    } catch (e) { console.error('notifications load failed', e); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [user]);

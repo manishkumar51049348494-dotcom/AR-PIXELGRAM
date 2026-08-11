@@ -3,20 +3,24 @@ import type { Profile, Post, Story, Comment, Message, Notification, Verification
 
 // ===================== PROFILES =====================
 export async function getProfile(userId: string): Promise<Profile | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
+  // Network/RLS error ko "profile nahi mila" mat samjho — warna app account
+  // delete hua dikhata hai. Error throw karo taaki UI retry dikha sake.
+  if (error) throw error;
   return data;
 }
 
 export async function getProfileById(profileId: string): Promise<Profile | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', profileId)
     .maybeSingle();
+  if (error) throw error;
   return data;
 }
 
