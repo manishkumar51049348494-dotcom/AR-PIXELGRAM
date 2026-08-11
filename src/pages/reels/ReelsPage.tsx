@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getReelsFeed, getReelById, recordReelView, toggleReelLike, deleteReel, createNotification, getReelCommentsCount, type Reel } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { withTimeout } from '@/lib/withTimeout';
 import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import ReelCommentsSheet from '@/components/common/ReelCommentsSheet';
@@ -272,12 +273,12 @@ const ReelsPage: React.FC = () => {
     try {
       const targetId = searchParams.get('r');
       const wantsComments = searchParams.get('comments') === '1';
-      let data = await getReelsFeed(10);
+      let data = await withTimeout(getReelsFeed(10), 10000);
 
       // Deep link from a notification/share link — if that reel isn't in the
       // first page, fetch it directly and pin it to the front.
       if (targetId && !data.some(r => r.id === targetId)) {
-        const target = await getReelById(targetId).catch(() => null);
+        const target = await withTimeout(getReelById(targetId), 10000).catch(() => null);
         if (target) data = [target, ...data];
       }
 
@@ -378,20 +379,11 @@ const ReelsPage: React.FC = () => {
     });
   };
 
+  // No blocking "reels loading" screen any more: the fetch above is hard
+  // capped by withTimeout, and we only paint a plain backdrop for the few
+  // hundred ms it takes, so nobody can get stuck on a spinner.
   if (loading) {
-    return (
-      <div className="h-[100dvh] flex items-center justify-center"
-        style={{ background: 'linear-gradient(160deg, hsl(var(--p1)) 0%, hsl(var(--p2)) 100%)' }}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white/40 bg-white shadow-xl">
-            <img src="https://miaoda-conversation-file.s3cdn.medo.dev/user-cjml2dkttc74/app-cjmldrzgvw1t/20260709/IMG_20260625_173359_866.jpg"
-              alt="logo" className="w-full h-full object-cover" />
-          </div>
-          <div className="w-8 h-8 rounded-full border-2 border-white border-t-transparent animate-spin" />
-          <p className="text-white/80 text-sm font-medium">{t('reels')} लोड हो रहे हैं...</p>
-        </div>
-      </div>
-    );
+    return <div className="h-[100dvh] bg-black" />;
   }
 
   if (!reels.length) {

@@ -27,14 +27,12 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
           const keys = await caches.keys();
           await Promise.all(keys.map((k) => caches.delete(k)));
         }
-        const hadOldWorker = !!navigator.serviceWorker.controller;
         const reg = await navigator.serviceWorker.register('/sw.js');
         await reg.update().catch(() => { /* noop */ });
-
-        if (hadOldWorker && !sessionStorage.getItem('sw-refreshed')) {
-          sessionStorage.setItem('sw-refreshed', '1');
-          window.location.reload();
-        }
+        // No automatic window.location.reload() here: that self-refresh was
+        // what made the app jump to a stuck loading screen ~1s after opening.
+        // Caches are already purged above and the new worker claims clients,
+        // so the fresh build is used from the next navigation onwards.
       } catch {
         /* noop */
       }

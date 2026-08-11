@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { routes } from '@/routes';
 
@@ -31,10 +31,10 @@ export function RouteGuard({ children }: RouteGuardProps) {
   const location = useLocation();
   const [timedOut, setTimedOut] = React.useState(false);
 
-  // Max 2s loading timeout — never hang forever
+  // Max 1.5s loading timeout — never hang forever
   React.useEffect(() => {
     if (!loading) return;
-    const t = setTimeout(() => setTimedOut(true), 2000);
+    const t = setTimeout(() => setTimedOut(true), 1500);
     return () => clearTimeout(t);
   }, [loading]);
 
@@ -72,27 +72,19 @@ export function RouteGuard({ children }: RouteGuardProps) {
     }
   }, [user, profile, isReady, location.pathname, navigate, isPublic]);
 
-  // While auth is loading AND on a protected route → show neutral splash, not page content
-  // This prevents unauthenticated users from seeing reels/home loading screen
-  // Also never render protected content when there is no signed-in user:
-  // the redirect below runs in an effect (one paint later), which is what let
-  // unauthenticated visitors briefly land on the reels feed and get stuck on
-  // its loading screen.
-  if (!isPublic && (!isReady || !user)) {
-    return (
-      <div className="h-[100dvh] w-full flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-primary/30 shadow-lg bg-white">
-            <img
-              src="https://miaoda-conversation-file.s3cdn.medo.dev/user-cjml2dkttc74/app-cjmldrzgvw1t/20260709/IMG_20260625_173359_866.jpg"
-              alt="AR Pixelgram"
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="w-7 h-7 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
-      </div>
-    );
+  // No spinner/splash screen anywhere. On a protected route we either wait
+  // one silent frame for the session check (blank backdrop, hard capped by the
+  // timeout above) or send the visitor straight to login — so a first-time
+  // visitor without an account can never land on (and get stuck in) the reels
+  // or home feed loading screen.
+  if (!isPublic && !isReady) {
+    return <div className="h-[100dvh] w-full bg-background" />;
+  }
+
+  if (!isPublic && !user) {
+    return location.pathname.startsWith('/admin')
+      ? <Navigate to="/admin-login" replace />
+      : <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
   return <>{children}</>;
