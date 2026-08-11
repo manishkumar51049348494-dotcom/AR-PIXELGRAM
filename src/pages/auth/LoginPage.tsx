@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { getProfile } from '@/services/api';
+import { withTimeout } from '@/lib/withTimeout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -63,13 +64,39 @@ const LoginPage: React.FC = () => {
     }
 
     if (data?.user) {
-      const profile = await getProfile(data.user.id);
+      // Profile fetch kabhi bhi network/RLS error se fail ho sakta hai.
+      // Us case me account ko "deleted" MAT samjho — warna sahi user ko
+      // "account hata diya gaya" screen dikh jaati hai aur app band ho jaata hai.
+      // Naye user par DB trigger profile row thodi der baad banata hai, isliye retry.
+      let profile: Awaited<ReturnType<typeof getProfile>> = null;
+      let profileFetchFailed = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          profile = await withTimeout(getProfile(data.user.id), 15000);
+          profileFetchFailed = false;
+          if (profile) break;
+        } catch (err) {
+          console.error('getProfile failed during login', err);
+          profileFetchFailed = true;
+        }
+        if (attempt < 2) await new Promise(res => setTimeout(res, 600));
+      }
 
-      // Account deleted or permanently disabled — sign out and redirect
-      if (!profile || profile.account_status === 'permanently_disabled') {
+      // Sirf tabhi "account deleted" jab server ne SAAF-SAAF permanently_disabled bataya ho.
+      if (profile && profile.account_status === 'permanently_disabled') {
         await supabase.auth.signOut();
         setLoading(false);
         navigate('/account-deleted');
+        return;
+      }
+
+      // Profile load nahi hua (network/timeout) — session bana rehne do, app khulne do.
+      if (!profile) {
+        setLoading(false);
+        if (profileFetchFailed) {
+          toast.error('Profile load nahi ho paaya. Internet check karein — aapka account safe hai.');
+        }
+        navigate('/home');
         return;
       }
 
