@@ -25,7 +25,11 @@ const ReelCard: React.FC<{
   const { t } = useLanguage();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [muted, setMuted] = useState(false);
+  const hasMusic = !!reel.music_preview_url;
+  const musicStart = (reel.music_start_ms || 0) / 1000;
+  const muteOriginal = hasMusic && !!reel.mute_original;
   const [liked, setLiked] = useState(reel.is_liked || false);
   const [likesCount, setLikesCount] = useState(reel.likes_count || 0);
   const [commentsCount, setCommentsCount] = useState(reel.comments_count || 0);
@@ -61,6 +65,25 @@ const ReelCard: React.FC<{
       v.currentTime = 0;
     }
   }, [isActive]);
+
+  // Reel ka gana — video ke saath play/pause aur chosen start point se loop
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !hasMusic) return;
+    if (isActive) {
+      a.currentTime = musicStart;
+      a.play().catch(() => {});
+    } else {
+      a.pause();
+      a.currentTime = musicStart;
+    }
+  }, [isActive, hasMusic, musicStart]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.muted = muted;
+  }, [muted]);
 
   // Count a view once this reel has actually been watched for a moment
   // (avoids counting a quick scroll-past as a "view").
@@ -127,17 +150,39 @@ const ReelCard: React.FC<{
           className="absolute inset-0 w-full h-full object-cover"
           loop
           playsInline
-          muted={muted}
+          muted={muted || muteOriginal}
           preload={isActive ? 'auto' : 'none'}
           onClick={() => {
             const v = videoRef.current;
             if (!v) return;
-            v.paused ? v.play().catch(() => {}) : v.pause();
+            const a = audioRef.current;
+            if (v.paused) {
+              v.play().catch(() => {});
+              a?.play().catch(() => {});
+            } else {
+              v.pause();
+              a?.pause();
+            }
           }}
         />
       ) : (
         // Placeholder for far-away reels — no network load
         <div className="absolute inset-0 bg-black" />
+      )}
+
+      {/* Reel ka gana */}
+      {isNear && hasMusic && (
+        <audio
+          ref={audioRef}
+          src={reel.music_preview_url || undefined}
+          preload={isActive ? 'auto' : 'none'}
+          onLoadedMetadata={(e) => { e.currentTarget.currentTime = musicStart; }}
+          onEnded={(e) => {
+            // Chosen start point se dobara loop karo (0 se nahi)
+            e.currentTarget.currentTime = musicStart;
+            e.currentTarget.play().catch(() => {});
+          }}
+        />
       )}
 
       {/* Gradient overlays */}
@@ -232,12 +277,22 @@ const ReelCard: React.FC<{
             👁 {viewsCount > 999 ? `${(viewsCount / 1000).toFixed(1)}k` : viewsCount} views
           </p>
         )}
-        {/* Animated music note */}
+        {/* Music info — Instagram jaisa */}
         <div className="flex items-center gap-2 mt-1">
-          <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur flex items-center justify-center animate-spin-slow">
-            <span className="text-xs">♪</span>
-          </div>
-          <span className="text-white/80 text-xs">AR Pixelgram Reel</span>
+          {hasMusic && reel.music_artwork_url ? (
+            <img
+              src={reel.music_artwork_url}
+              alt={reel.music_title || 'song'}
+              className="w-6 h-6 rounded-full object-cover border border-white/40 animate-spin-slow"
+            />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur flex items-center justify-center animate-spin-slow">
+              <span className="text-xs">♪</span>
+            </div>
+          )}
+          <span className="text-white/85 text-xs truncate max-w-[65%]">
+            {hasMusic ? `${reel.music_title} · ${reel.music_artist}` : 'AR Pixelgram Reel'}
+          </span>
         </div>
       </div>
 

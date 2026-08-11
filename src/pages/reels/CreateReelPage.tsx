@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Film, Upload, X, Loader2, ArrowLeft } from 'lucide-react';
+import { Film, Upload, X, Loader2, ArrowLeft, Music2, VolumeX, Volume2, Pencil } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { createReel, uploadVideo } from '@/services/api';
+import { createReel, uploadVideo, type ReelMusic } from '@/services/api';
+import type { MusicTrack } from '@/services/music';
+import MusicPickerSheet from '@/components/reels/MusicPickerSheet';
+import MusicTrimmer from '@/components/reels/MusicTrimmer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -19,6 +22,13 @@ const CreateReelPage: React.FC = () => {
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Music state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [trimTrack, setTrimTrack] = useState<MusicTrack | null>(null);
+  const [track, setTrack] = useState<MusicTrack | null>(null);
+  const [startMs, setStartMs] = useState(0);
+  const [muteOriginal, setMuteOriginal] = useState(true);
+
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -33,7 +43,19 @@ const CreateReelPage: React.FC = () => {
     setLoading(true);
     try {
       const videoUrl = await uploadVideo('reels', videoFile, user.id);
-      await createReel(user.id, videoUrl, caption.trim());
+      const music: ReelMusic | null = track
+        ? {
+            track_id: track.id,
+            title: track.title,
+            artist: track.artist,
+            artwork_url: track.artwork,
+            preview_url: track.previewUrl,
+            start_ms: startMs,
+            duration_ms: track.durationMs,
+            mute_original: muteOriginal,
+          }
+        : null;
+      await createReel(user.id, videoUrl, caption.trim(), undefined, music);
       toast.success('Reel published! 🎬');
       navigate('/reels');
     } catch {
@@ -87,6 +109,7 @@ const CreateReelPage: React.FC = () => {
               className="w-full h-full object-cover"
               controls
               playsInline
+              muted={!!track && muteOriginal}
             />
             <button
               onClick={() => { setVideoFile(null); setVideoPreview(null); }}
@@ -105,6 +128,63 @@ const CreateReelPage: React.FC = () => {
           onChange={handleVideoChange}
         />
 
+        {/* Music */}
+        {!track ? (
+          <button
+            onClick={() => {
+              if (!videoPreview) { toast.error('Pehle video select karo'); return; }
+              setPickerOpen(true);
+            }}
+            className="w-full flex items-center gap-3 glass-card rounded-2xl px-4 py-3.5"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Music2 className="w-5 h-5 text-primary" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-foreground">Add music</span>
+            <span className="text-xs font-bold text-primary">Search</span>
+          </button>
+        ) : (
+          <div className="glass-card rounded-2xl p-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-lg overflow-hidden bg-muted shrink-0">
+                {track.artwork ? (
+                  <img src={track.artwork} alt={track.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center"><Music2 className="w-5 h-5 text-muted-foreground" /></div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{track.title}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {track.artist} · starts at {Math.floor(startMs / 1000)}s
+                </p>
+              </div>
+              <button onClick={() => setTrimTrack(track)} className="p-2 rounded-full hover:bg-muted/60">
+                <Pencil className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button onClick={() => setTrack(null)} className="p-2 rounded-full hover:bg-muted/60">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <button
+              onClick={() => setMuteOriginal((m) => !m)}
+              className="w-full flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2.5"
+            >
+              {muteOriginal ? <VolumeX className="w-4 h-4 text-foreground" /> : <Volume2 className="w-4 h-4 text-foreground" />}
+              <span className="flex-1 text-left text-xs font-medium text-foreground">
+                {muteOriginal ? 'Video ki original voice muted hai' : 'Video ki original voice on hai'}
+              </span>
+              <span className="text-xs font-bold text-primary">{muteOriginal ? 'Unmute' : 'Mute'}</span>
+            </button>
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="w-full text-xs font-semibold text-primary py-1"
+            >
+              Change song
+            </button>
+          </div>
+        )}
+
         {/* Caption */}
         <div className="glass-card rounded-2xl p-4 space-y-2">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('caption')}</label>
@@ -118,6 +198,34 @@ const CreateReelPage: React.FC = () => {
           <p className="text-right text-xs text-muted-foreground">{caption.length}/500</p>
         </div>
       </div>
+
+      {/* Song search sheet */}
+      <MusicPickerSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(selected) => {
+          setPickerOpen(false);
+          setTrimTrack(selected);
+        }}
+      />
+
+      {/* Trim / set start point */}
+      {trimTrack && videoPreview && (
+        <MusicTrimmer
+          track={trimTrack}
+          videoUrl={videoPreview}
+          initialStartMs={trimTrack.id === track?.id ? startMs : 0}
+          initialMuteOriginal={muteOriginal}
+          onBack={() => setTrimTrack(null)}
+          onDone={({ startMs: s, muteOriginal: m }) => {
+            setTrack(trimTrack);
+            setStartMs(s);
+            setMuteOriginal(m);
+            setTrimTrack(null);
+            toast.success('Music added 🎵');
+          }}
+        />
+      )}
     </div>
   );
 };

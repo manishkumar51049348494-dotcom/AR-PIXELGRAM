@@ -872,6 +872,17 @@ export async function uploadVideo(bucket: 'stories' | 'reels', file: File, userI
 }
 
 // ===================== REELS =====================
+export interface ReelMusic {
+  track_id: string;
+  title: string;
+  artist: string;
+  artwork_url?: string;
+  preview_url: string;
+  start_ms: number;
+  duration_ms?: number;
+  mute_original: boolean;
+}
+
 export interface Reel {
   id: string;
   user_id: string;
@@ -884,6 +895,14 @@ export interface Reel {
   created_at: string;
   profile?: Profile;
   is_liked?: boolean;
+  music_track_id?: string | null;
+  music_title?: string | null;
+  music_artist?: string | null;
+  music_artwork_url?: string | null;
+  music_preview_url?: string | null;
+  music_start_ms?: number | null;
+  music_duration_ms?: number | null;
+  mute_original?: boolean | null;
 }
 
 export async function getReelsFeed(limit = 20, offset = 0): Promise<Reel[]> {
@@ -937,11 +956,38 @@ export async function getUserReels(userId: string): Promise<Reel[]> {
   return (data || []) as Reel[];
 }
 
-export async function createReel(userId: string, videoUrl: string, caption: string, thumbnailUrl?: string): Promise<void> {
-  const { error } = await supabase.from('reels').insert({
+export async function createReel(
+  userId: string,
+  videoUrl: string,
+  caption: string,
+  thumbnailUrl?: string,
+  music?: ReelMusic | null,
+): Promise<void> {
+  const base = {
     user_id: userId, video_url: videoUrl, caption, thumbnail_url: thumbnailUrl || null,
-  });
-  if (error) throw error;
+  };
+  const withMusic = music
+    ? {
+        ...base,
+        music_track_id: music.track_id,
+        music_title: music.title,
+        music_artist: music.artist,
+        music_artwork_url: music.artwork_url || null,
+        music_preview_url: music.preview_url,
+        music_start_ms: music.start_ms,
+        music_duration_ms: music.duration_ms || null,
+        mute_original: music.mute_original,
+      }
+    : base;
+  const { error } = await supabase.from('reels').insert(withMusic);
+  if (!error) return;
+  // Agar music columns abhi DB me migrate nahi hui hain, reel bina gaane ke
+  // publish ho jaye — upload waste na ho.
+  if (music) {
+    const { error: retryError } = await supabase.from('reels').insert(base);
+    if (!retryError) return;
+  }
+  throw error;
 }
 
 export async function toggleReelLike(reelId: string, userId: string, isLiked: boolean): Promise<void> {
