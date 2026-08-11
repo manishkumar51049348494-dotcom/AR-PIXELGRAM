@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Send, CornerDownRight, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -115,10 +116,18 @@ const ReelCommentsSheet: React.FC<Props> = ({ reelId, reelOwnerId, open, onClose
     </div>
   );
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+  // Render via portal directly into document.body so the sheet is not clipped
+  // or positioned relative to a transformed parent (the reels slide rail uses
+  // translateY, which turns position:fixed into relative-to-parent).
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center"
+      onTouchStart={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
+    >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-card rounded-t-2xl flex flex-col max-h-[75vh]">
+      <div className="relative w-full max-w-lg bg-card rounded-t-2xl flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-foreground">Comments · {comments.length}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted"><X className="w-5 h-5 text-muted-foreground" /></button>
@@ -146,20 +155,36 @@ const ReelCommentsSheet: React.FC<Props> = ({ reelId, reelOwnerId, open, onClose
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-3 border-t border-border">
-          <Input
-            placeholder={replyTo ? `Reply to ${replyTo.profile?.username}…` : 'Add a comment…'}
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            className="flex-1 h-10"
-            maxLength={500}
-          />
-          <Button type="submit" size="icon" className="h-10 w-10 shrink-0" disabled={!content.trim() || loading}>
-            <Send className="w-4 h-4" />
-          </Button>
-        </form>
+        {user ? (
+          <form
+            onSubmit={handleSubmit}
+            className="flex items-center gap-2 px-4 py-3 border-t border-border"
+            style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
+          >
+            <Input
+              placeholder={replyTo ? `Reply to ${replyTo.profile?.username}…` : 'Add a comment…'}
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              className="flex-1 h-10"
+              maxLength={500}
+            />
+            <Button type="submit" size="icon" className="h-10 w-10 shrink-0" disabled={!content.trim() || loading}>
+              <Send className="w-4 h-4" />
+            </Button>
+          </form>
+        ) : (
+          <div
+            className="px-4 py-3 border-t border-border bg-muted/40 text-center"
+            style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
+          >
+            <button onClick={() => { onClose(); navigate('/login'); }} className="text-sm font-semibold text-primary hover:underline">
+              Sign in to comment
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
