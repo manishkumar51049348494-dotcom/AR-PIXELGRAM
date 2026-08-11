@@ -4,10 +4,11 @@ import MobileLayout from '@/components/layouts/MobileLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/withTimeout';
 import {
-  getFeedStories, createStory, uploadImage, uploadVideo, deleteStory,
+  getFeedStories, getAllPosts, createStory, uploadImage, uploadVideo, deleteStory,
   toggleStoryLike, isStoryLiked, getStoryLikers, recordStoryView, sendMessage, createNotification
 } from '@/services/api';
-import type { Story, Profile } from '@/types/types';
+import type { Story, Profile, Post } from '@/types/types';
+import PostCard from '@/components/common/PostCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, X, ChevronLeft, ChevronRight, Trash2, ImagePlus, Film, Loader2, Share2, Heart, Eye, Send, Clock } from 'lucide-react';
@@ -47,6 +48,12 @@ const StoriesPage: React.FC = () => {
   const [likers, setLikers] = useState<Profile[]>([]);
   const [loadingLikers, setLoadingLikers] = useState(false);
   const videoViewerRef = useRef<HTMLVideoElement>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [postsPage, setPostsPage] = useState(0);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const POSTS_PAGE_SIZE = 10;
 
   useEffect(() => {
     if (!user) return;
@@ -55,6 +62,37 @@ const StoriesPage: React.FC = () => {
       .catch((e) => { console.error('stories load failed', e); })
       .finally(() => { setLoading(false); });
   }, [user]);
+
+  // Load posts feed (shown below the stories row)
+  useEffect(() => {
+    if (!user) return;
+    setPostsLoading(true);
+    withTimeout(getAllPosts(0, POSTS_PAGE_SIZE, user.id), 20000)
+      .then(p => { setPosts(p); setPostsPage(0); setHasMorePosts(p.length === POSTS_PAGE_SIZE); })
+      .catch(e => { console.error('posts load failed', e); })
+      .finally(() => setPostsLoading(false));
+  }, [user]);
+
+  const loadMorePosts = async () => {
+    if (!user || loadingMore || !hasMorePosts) return;
+    setLoadingMore(true);
+    try {
+      const next = postsPage + 1;
+      const more = await withTimeout(getAllPosts(next, POSTS_PAGE_SIZE, user.id), 20000);
+      setPosts(prev => {
+        const seen = new Set(prev.map(p => p.id));
+        return [...prev, ...more.filter(p => !seen.has(p.id))];
+      });
+      setPostsPage(next);
+      setHasMorePosts(more.length === POSTS_PAGE_SIZE);
+    } catch (e) {
+      console.error('load more posts failed', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleDeletePost = (postId: string) => setPosts(prev => prev.filter(p => p.id !== postId));
 
   // Record view when story is opened + load liked state
   useEffect(() => {
@@ -211,12 +249,40 @@ const StoriesPage: React.FC = () => {
         </div>
 
         {groupKeys.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-            <span className="text-5xl mb-4">📖</span>
+          <div className="flex flex-col items-center justify-center py-8 text-center px-6">
+            <span className="text-4xl mb-2">📖</span>
             <h3 className="font-semibold text-foreground mb-1">{t('noStoriesYet')}</h3>
             <p className="text-sm text-muted-foreground text-pretty">Follow people or add your own story!</p>
           </div>
         )}
+
+        {/* Posts feed — below the stories row */}
+        <div className="border-t border-border pt-2 pb-24">
+          {postsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <span className="text-5xl mb-4">🖼️</span>
+              <h3 className="font-semibold text-foreground mb-1">अभी कोई पोस्ट नहीं</h3>
+              <p className="text-sm text-muted-foreground">पहली पोस्ट अपलोड करें!</p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {posts.map(post => (
+                <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
+              ))}
+              {hasMorePosts && (
+                <div className="flex justify-center py-4">
+                  <Button variant="outline" onClick={loadMorePosts} disabled={loadingMore}>
+                    {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : 'और पोस्ट देखें'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Story viewer */}
