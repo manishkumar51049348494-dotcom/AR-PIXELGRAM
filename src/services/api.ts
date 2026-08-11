@@ -144,13 +144,14 @@ export async function deletePost(postId: string): Promise<void> {
   await supabase.from('posts').delete().eq('id', postId);
 }
 
-export async function getAllPosts(page = 0, pageSize = 20): Promise<Post[]> {
+export async function getAllPosts(page = 0, pageSize = 20, currentUserId?: string): Promise<Post[]> {
   const { data } = await supabase
     .from('posts')
     .select('*, profiles!posts_user_id_fkey(*)')
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
-  return Array.isArray(data) ? data.map(p => ({ ...p, profile: p.profiles })) : [];
+  const posts = Array.isArray(data) ? data.map(p => ({ ...p, profile: p.profiles })) : [];
+  return attachPostSocialMeta(posts, currentUserId);
 }
 
 // ===================== LIKES =====================
