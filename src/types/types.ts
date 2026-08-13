@@ -80,7 +80,7 @@ export interface Notification {
   id: string;
   user_id: string;
   actor_id: string | null;
-  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accepted' | 'verified' | 'broadcast' | 'suspended' | 'story_like' | 'story_reply' | 'reel_like' | 'reel_comment' | 'comment_reply' | 'message';
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accepted' | 'verified' | 'broadcast' | 'suspended' | 'story_like' | 'story_reply' | 'reel_like' | 'reel_comment' | 'comment_reply' | 'message' | 'new_story';
   post_id: string | null;
   comment_id: string | null;
   message: string | null;
