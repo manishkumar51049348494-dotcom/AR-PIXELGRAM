@@ -399,13 +399,22 @@ export async function getUnreadCount(receiverId: string, senderId: string): Prom
 
 // ===================== NOTIFICATIONS =====================
 export async function getNotifications(userId: string, page = 0): Promise<Notification[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('notifications')
-    .select('*, profiles!notifications_actor_id_fkey(*)')
+    .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(page * 20, (page + 1) * 20 - 1);
-  return Array.isArray(data) ? data.map(n => ({ ...n, actor: n.profiles })) : [];
+  if (error) { console.error('getNotifications failed', error); return []; }
+  const rows = Array.isArray(data) ? data : [];
+  const actorIds = Array.from(new Set(rows.map(n => n.actor_id).filter(Boolean))) as string[];
+  if (actorIds.length === 0) return rows as Notification[];
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('user_id', actorIds);
+  const byId = new Map((profs || []).map(pr => [pr.user_id, pr]));
+  return rows.map(n => ({ ...n, actor: n.actor_id ? byId.get(n.actor_id) : undefined })) as Notification[];
 }
 
 export async function markNotificationsRead(userId: string): Promise<void> {
@@ -443,6 +452,7 @@ export async function createNotification(
     follow_request: `${who} sent a follow request`,
     follow_accepted: `${who} accepted your follow request`,
     message: `New message from ${who}`,
+    new_story: `${who} added a new story`,
   };
   const title = titles[type];
   if (!title || message?.startsWith('📞') || message?.startsWith('📵')) return;
@@ -460,7 +470,9 @@ export async function createNotification(
       data: {
         url: type === 'message' && actorId
           ? `/chat/${actorId}`
-          : isReelType ? reelUrl : '/notifications',
+          : type === 'new_story' && actorId
+            ? `/stories?u=${actorId}`
+            : isReelType ? reelUrl : '/notifications',
         icon: actor?.avatar_url || '/images/logo/logo-icon.svg',
       },
     },
