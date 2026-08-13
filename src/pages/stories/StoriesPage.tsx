@@ -105,6 +105,17 @@ const StoriesPage: React.FC = () => {
   const groupKeys = Object.keys(groups);
 
   const openViewer = (uid: string) => { setViewerUserId(uid); setStoryIndex(0); setShowReply(false); };
+
+  // Open a specific user's stories when arriving from a notification (/stories?u=<userId>)
+  const openedFromQuery = useRef(false);
+  useEffect(() => {
+    if (openedFromQuery.current || loading) return;
+    const uid = new URLSearchParams(window.location.search).get('u');
+    if (uid && groups[uid]) {
+      openedFromQuery.current = true;
+      openViewer(uid);
+    }
+  }, [loading, stories]); // eslint-disable-line react-hooks/exhaustive-deps
   const closeViewer = () => { setViewerUserId(null); setShowReply(false); };
 
   const viewerGroup = viewerUserId ? groups[viewerUserId] : null;
