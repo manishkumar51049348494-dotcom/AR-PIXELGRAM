@@ -8,7 +8,7 @@ import {
 } from '@/services/api';
 import { supabase } from '@/db/supabase';
 import type { Notification } from '@/types/types';
-import { BadgeCheck, Heart, MessageCircle, UserPlus, Bell, Check, X, ShieldOff, Megaphone, Film, Mail, CornerDownRight } from 'lucide-react';
+import { BadgeCheck, Heart, MessageCircle, UserPlus, Bell, Check, X, ShieldOff, Megaphone, Film, Mail, CornerDownRight, Camera } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ const NotificationIcon: React.FC<{ type: Notification['type'] }> = ({ type }) =>
     case 'verified': return <BadgeCheck className="w-4 h-4 text-primary" />;
     case 'suspended': return <ShieldOff className="w-4 h-4 text-destructive" />;
     case 'broadcast': return <Megaphone className="w-4 h-4 text-primary" />;
+    case 'new_story': return <Camera className="w-4 h-4 text-pink-500" />;
     default: return <Bell className="w-4 h-4 text-primary" />;
   }
 };
@@ -102,7 +103,7 @@ const NotificationsPage: React.FC = () => {
   };
 
   const getNotifText = (notif: Notification) => {
-    const username = notif.actor?.username || 'किसी';
+    const username = notif.actor?.full_name || notif.actor?.username || 'किसी';
     switch (notif.type) {
       case 'like': return `${username} ने आपकी पोस्ट like की`;
       case 'reel_like': return `${username} ने आपकी reel like की`;
@@ -111,7 +112,8 @@ const NotificationsPage: React.FC = () => {
       case 'reel_comment': return `${username} ने आपकी reel पर comment किया${notif.message ? `: ${notif.message}` : ''}`;
       case 'comment_reply': return `${username} ने आपके comment का reply दिया${notif.message ? `: ${notif.message}` : ''}`;
       case 'story_reply': return `${username} ने आपकी story पर reply भेजा`;
-      case 'message': return `${username} ने आपको message भेजा`;
+      case 'message': return `${username} ने आपको message भेजा${notif.message ? `: ${notif.message}` : ''}`;
+      case 'new_story': return `${username} ने नई story डाली`;
       case 'follow': return `${username} ने follow किया`;
       case 'follow_request': return `${username} ने follow request भेजी`;
       case 'follow_accepted': return `${username} ने आपकी follow request स्वीकार की`;
@@ -140,6 +142,10 @@ const NotificationsPage: React.FC = () => {
         return;
       case 'message':
         if (notif.actor_id) navigate(`/chat/${notif.actor_id}`);
+        return;
+      case 'new_story':
+        if (notif.actor_id) navigate(`/stories?u=${notif.actor_id}`);
+        else navigate('/stories');
         return;
       case 'like':
       case 'comment':
