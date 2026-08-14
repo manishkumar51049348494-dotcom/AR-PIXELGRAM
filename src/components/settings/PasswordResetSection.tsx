@@ -22,7 +22,16 @@ const PasswordResetSection: React.FC = () => {
   const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const identifier = user?.email || profile?.username || '';
+  const accountEmail = user?.email || '';
+  const identifier = accountEmail || profile?.username || '';
+
+  // Account ka email masked form me — user ko pehle hi dikh jaye ki code kahan jayega.
+  const maskEmail = (email: string) => {
+    const [name, domain] = email.split('@');
+    if (!domain) return email;
+    const visible = name.length <= 2 ? name[0] : `${name.slice(0, 1)}${'*'.repeat(Math.max(1, name.length - 2))}${name.slice(-1)}`;
+    return `${visible}@${domain}`;
+  };
 
   const sendCode = async () => {
     if (!identifier) { toast.error('Account load nahi hua'); return; }
@@ -68,10 +77,16 @@ const PasswordResetSection: React.FC = () => {
 
       {stage === 'idle' ? (
         <>
+          <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Is account ka email</p>
+            <p className="text-sm font-semibold text-foreground break-all">
+              {accountEmail ? maskEmail(accountEmail) : 'Email add nahi hai'}
+            </p>
+          </div>
           <p className="text-sm text-muted-foreground">
-            Password reset karne ke liye hum aapke email par 6-digit code bhejenge.
+            Isi email par 6-digit code bhejenge. Code daal kar naya password set kar sakte hain.
           </p>
-          <Button onClick={() => void sendCode()} disabled={busy} className="w-full h-10 font-semibold">
+          <Button onClick={() => void sendCode()} disabled={busy || !identifier} className="w-full h-10 font-semibold">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send code'}
           </Button>
         </>
