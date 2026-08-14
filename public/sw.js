@@ -11,6 +11,14 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
+// Page se aane wala update signal: naya worker turant activate ho jaye taki
+// installed app ko wahi purana URL kholne par hi latest build mile.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
