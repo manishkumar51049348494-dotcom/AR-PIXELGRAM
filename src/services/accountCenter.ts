@@ -23,22 +23,34 @@ export async function listMyIdentifiers(): Promise<AccountIdentifier[]> {
   return (data ?? []) as AccountIdentifier[];
 }
 
+/** Edge function ka asli error message nikalta hai (warna sirf generic error milta hai). */
+async function invokeFn(name: string, body: Record<string, unknown>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    // supabase-js non-2xx par error deta hai aur body error.context (Response) me hota hai.
+    const ctx = (error as any)?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const parsed = await ctx.clone().json();
+        if (parsed?.error) throw new Error(parsed.error);
+      } catch (e) {
+        if (e instanceof Error && e.message && !/json/i.test(e.message)) throw e;
+      }
+    }
+    throw new Error(error.message || 'Server se jawab nahi mila. Dobara try karein.');
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 /** OTP bhejta hai us email/number par jise add karna hai. */
 export async function sendIdentifierOtp(type: IdentifierType, value: string): Promise<void> {
-  const { data, error } = await supabase.functions.invoke('account-identifier-start', {
-    body: { type, value },
-  });
-  if (error && !data?.error) throw new Error('OTP bhejne me dikkat aayi. Dobara try karein.');
-  if (data?.error) throw new Error(data.error);
+  await invokeFn('account-identifier-start', { type, value });
 }
 
 /** OTP verify karke email/number ko account se jodta hai. */
 export async function confirmIdentifierOtp(type: IdentifierType, value: string, code: string): Promise<void> {
-  const { data, error } = await supabase.functions.invoke('account-identifier-confirm', {
-    body: { type, value, code },
-  });
-  if (error && !data?.error) throw new Error('Verify karne me dikkat aayi. Dobara try karein.');
-  if (data?.error) throw new Error(data.error);
+  await invokeFn('account-identifier-confirm', { type, value, code });
 }
 
 export async function removeIdentifier(id: string): Promise<void> {
