@@ -2,7 +2,7 @@
   "name": "AR Pixelgram",
   "short_name": "AR Pixelgram",
   "description": "AR Pixelgram — posts, reels, stories aur chat.",
-  "start_url": "/home",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
