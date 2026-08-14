@@ -134,9 +134,9 @@ Deno.serve(async (req) => {
     if (message.includes('email_provider_not_configured')) {
       return json({ error: 'Email OTP service abhi setup nahi hai.' }, 500);
     }
-    if (message.includes('send_failed')) {
-      return json({ error: 'OTP bhejne me dikkat aayi. Thodi der baad try karein.' }, 502);
+    if (message.includes('email_send_failed')) {
+      return json({ error: `Email nahi bheja ja saka: ${message.replace('email_send_failed: ', '')}` }, 502);
     }
-    return json({ error: 'Kuch galat ho gaya. Dobara try karein.' }, 500);
+    return json({ error: `Kuch galat ho gaya: ${message}` }, 500);
   }
 });
