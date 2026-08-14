@@ -6,7 +6,6 @@ import type { Comment } from '@/types/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { BadgeCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface CommentsSheetProps {
@@ -16,12 +15,20 @@ interface CommentsSheetProps {
   onClose: () => void;
 }
 
+/**
+ * Keyboard-aware comments sheet.
+ * Phone par keyboard khulte hi input screen ke neeche chala jata tha. Ab
+ * visualViewport se keyboard ki height nikaal kar sheet ko upar utha dete hain,
+ * isliye "Add a comment…" hamesha keyboard ke thik uper dikhta hai.
+ */
 const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open, onClose }) => {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -32,6 +39,26 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
+
+  // Keyboard height track karo (iOS + Android dono par visualViewport milta hai).
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardInset(inset);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      setKeyboardInset(0);
+    };
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +74,8 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
       }
       const updated = await getComments(postId);
       setComments(updated);
+      // Keyboard khula rakho taki user lagataar comment kar sake.
+      inputRef.current?.focus();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Comment save nahi hua');
     } finally {
@@ -59,9 +88,17 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-card rounded-t-2xl flex flex-col max-h-[70vh]">
+      <div
+        className="relative w-full max-w-lg bg-card rounded-t-2xl flex flex-col"
+        style={{
+          // Keyboard ke barabar upar shift + utni hi height kam.
+          bottom: keyboardInset,
+          maxHeight: `calc(75vh - ${keyboardInset}px)`,
+          height: keyboardInset > 0 ? `calc(75vh - ${keyboardInset}px)` : undefined,
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <h3 className="font-semibold text-foreground">Comments</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
@@ -96,12 +133,18 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
           <div ref={bottomRef} />
         </div>
 
-        {/* Comment input */}
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-3 border-t border-border">
+        {/* Comment input — hamesha keyboard ke uper */}
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-2 px-4 py-3 border-t border-border bg-card shrink-0"
+          style={{ paddingBottom: keyboardInset > 0 ? 12 : 'max(12px, env(safe-area-inset-bottom))' }}
+        >
           <Input
+            ref={inputRef}
             placeholder="Add a comment…"
             value={content}
             onChange={e => setContent(e.target.value)}
+            onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 250)}
             className="flex-1 h-10"
             maxLength={200}
           />

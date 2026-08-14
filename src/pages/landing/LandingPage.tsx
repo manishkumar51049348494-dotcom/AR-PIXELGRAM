@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, MessageCircle, Film, Sparkles, Camera } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import InstallAppButton from '@/components/common/InstallAppButton';
 
 const TECH_TRICKS_LOGO = 'https://miaoda-conversation-file.s3cdn.medo.dev/user-cjml2dkttc74/app-cjmldrzgvw1t/20260709/IMG_20260625_173359_866.jpg';
 
@@ -84,6 +85,11 @@ const LandingPage: React.FC = () => {
           >
             लॉगिन करें
           </button>
+
+          {/* App install (PWA) */}
+          <div className="flex justify-center pt-1">
+            <InstallAppButton label="App install करें" className="h-11 px-5 text-sm" />
+          </div>
         </div>
       </div>
 

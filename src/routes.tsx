@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import LoginPage from './pages/auth/LoginPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import AccountDeletedPage from './pages/auth/AccountDeletedPage';
 import LandingPage from './pages/landing/LandingPage';
@@ -47,7 +46,6 @@ export const routes: RouteConfig[] = [
   { name: 'Landing', path: '/', element: <LandingPage />, public: true },
   { name: 'Login', path: '/login', element: <LoginPage />, public: true },
   { name: 'Forgot Password', path: '/forgot-password', element: <ForgotPasswordPage />, public: true },
-  { name: 'Reset Password', path: '/reset-password', element: <ResetPasswordPage />, public: true },
   { name: 'Register', path: '/register', element: <RegisterPage />, public: true },
   { name: 'Admin Login', path: '/admin-login', element: <AdminLoginPage />, public: true },
   { name: 'Appeal', path: '/appeal', element: <AppealPage />, public: true },

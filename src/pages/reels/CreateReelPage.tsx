@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Film, Upload, X, Loader2, ArrowLeft, Music2, VolumeX, Volume2, Pencil } from 'lucide-react';
+import {
+  Film, X, Loader2, ArrowLeft, Music2, VolumeX, Volume2, Pencil, ImageIcon,
+  Play, Pause, Check, ChevronRight, Sparkles,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { createReel, uploadVideo, type ReelMusic } from '@/services/api';
+import { createReel, uploadVideo, uploadImage, type ReelMusic } from '@/services/api';
 import type { MusicTrack } from '@/services/music';
 import MusicPickerSheet from '@/components/reels/MusicPickerSheet';
 import MusicTrimmer from '@/components/reels/MusicTrimmer';
@@ -11,16 +13,34 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
+type Step = 'pick' | 'edit' | 'share';
+
+/**
+ * Instagram jaisa Reel upload flow:
+ *  1) Pick   — gallery se video select
+ *  2) Edit   — full-screen 9:16 preview, side tools (music, audio, cover)
+ *  3) Share  — cover + caption + Share button
+ * Songs wala pura system waise ka waisa hai (search + trim + original audio mute).
+ */
 const CreateReelPage: React.FC = () => {
   const { user } = useAuth();
-  const { t } = useLanguage();
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
+  const [step, setStep] = useState<Step>('pick');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [duration, setDuration] = useState(0);
+  const [playing, setPlaying] = useState(true);
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Cover frame
+  const [coverTime, setCoverTime] = useState(0);
+  const [coverPicker, setCoverPicker] = useState(false);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   // Music state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -29,20 +49,79 @@ const CreateReelPage: React.FC = () => {
   const [startMs, setStartMs] = useState(0);
   const [muteOriginal, setMuteOriginal] = useState(true);
 
+  useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
+
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('video/')) { toast.error('Please select a video file'); return; }
-    if (file.size > 100 * 1024 * 1024) { toast.error('Video must be under 100MB'); return; }
+    if (!file.type.startsWith('video/')) { toast.error('Video file select karein'); return; }
+    if (file.size > 100 * 1024 * 1024) { toast.error('Video 100MB se chhota hona chahiye'); return; }
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
+    setStep('edit');
+  };
+
+  // Selected song ko video ke saath preview me chalao (Instagram jaisa feel).
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !track?.previewUrl) return;
+    audio.currentTime = Math.min(startMs / 1000, audio.duration || startMs / 1000);
+    if (playing && step === 'edit') void audio.play().catch(() => {});
+    else audio.pause();
+  }, [track, startMs, playing, step]);
+
+  const togglePlay = () => {
+    const v = previewRef.current;
+    if (!v) return;
+    if (v.paused) { void v.play(); setPlaying(true); }
+    else { v.pause(); setPlaying(false); }
+  };
+
+  /** Chosen frame se cover (thumbnail) image banata hai. */
+  const captureCover = useCallback(async (): Promise<File | null> => {
+    const v = previewRef.current;
+    if (!v) return null;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = v.videoWidth || 720;
+      canvas.height = v.videoHeight || 1280;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      const blob: Blob | null = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.85));
+      if (!blob) return null;
+      return new File([blob], `cover_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const goToShare = async () => {
+    const v = previewRef.current;
+    if (v) {
+      v.pause();
+      setPlaying(false);
+      v.currentTime = coverTime;
+      await new Promise(r => setTimeout(r, 250));
+      const file = await captureCover();
+      if (file) setCoverPreview(URL.createObjectURL(file));
+    }
+    audioRef.current?.pause();
+    setStep('share');
   };
 
   const handlePublish = async () => {
-    if (!user || !videoFile) { toast.error('Please select a video'); return; }
+    if (!user || !videoFile) { toast.error('Pehle video select karein'); return; }
     setLoading(true);
     try {
       const videoUrl = await uploadVideo('reels', videoFile, user.id);
+
+      let thumbnailUrl: string | undefined;
+      const coverFile = await captureCover();
+      if (coverFile) {
+        try { thumbnailUrl = await uploadImage('posts', coverFile, user.id); } catch { /* cover optional */ }
+      }
+
       const music: ReelMusic | null = track
         ? {
             track_id: track.id,
@@ -55,177 +134,269 @@ const CreateReelPage: React.FC = () => {
             mute_original: muteOriginal,
           }
         : null;
-      await createReel(user.id, videoUrl, caption.trim(), undefined, music);
-      toast.success('Reel published! 🎬');
+
+      await createReel(user.id, videoUrl, caption.trim(), thumbnailUrl, music);
+      toast.success('Reel share ho gaya 🎬');
       navigate('/reels');
     } catch {
-      toast.error('Failed to publish reel');
+      toast.error('Reel publish nahi ho paaya');
     } finally {
       setLoading(false);
     }
   };
 
+  /* ---------------------------- STEP 1 — PICK ---------------------------- */
+  if (step === 'pick') {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <button onClick={() => navigate(-1)} className="p-2 rounded-full active:bg-white/10">
+            <X className="w-6 h-6 text-white" />
+          </button>
+          <h1 className="flex-1 text-center text-base font-bold text-white pr-8">New reel</h1>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-5">
+          <div className="w-24 h-24 rounded-3xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}>
+            <Film className="w-11 h-11 text-white" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-lg font-bold text-white">Reel banayein</p>
+            <p className="text-sm text-white/60">Gallery se video chunein · MP4, MOV · Max 100MB</p>
+          </div>
+        </div>
+
+        <div className="px-6 pb-10 space-y-3">
+          <button
+            onClick={() => videoInputRef.current?.click()}
+            className="w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+          >
+            <ImageIcon className="w-5 h-5" /> Gallery se select karein
+          </button>
+          <p className="text-center text-[11px] text-white/40">
+            Video select karne ke baad music, cover aur caption add kar sakte hain.
+          </p>
+        </div>
+
+        <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+      </div>
+    );
+  }
+
+  /* ---------------------------- STEP 2 — EDIT ---------------------------- */
+  if (step === 'edit') {
+    return (
+      <div className="fixed inset-0 bg-black">
+        {/* Video */}
+        <video
+          ref={previewRef}
+          src={videoPreview ?? undefined}
+          className="absolute inset-0 w-full h-full object-contain"
+          playsInline
+          autoPlay
+          loop
+          muted={!!track && muteOriginal}
+          onClick={togglePlay}
+          onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)}
+        />
+        {track?.previewUrl && <audio ref={audioRef} src={track.previewUrl} loop />}
+
+        {!playing && (
+          <button onClick={togglePlay} className="absolute inset-0 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center">
+              <Play className="w-8 h-8 text-white" />
+            </div>
+          </button>
+        )}
+
+        {/* Top bar */}
+        <div className="absolute top-0 inset-x-0 flex items-center gap-2 px-3 pt-3">
+          <button
+            onClick={() => { setStep('pick'); setVideoFile(null); setVideoPreview(null); setTrack(null); }}
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex-1" />
+          <button onClick={togglePlay} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
+            {playing ? <Pause className="w-5 h-5 text-white" /> : <Play className="w-5 h-5 text-white" />}
+          </button>
+        </div>
+
+        {/* Right-side tool rail (Instagram jaisa) */}
+        <div className="absolute right-3 top-20 flex flex-col gap-4">
+          <button onClick={() => setPickerOpen(true)} className="flex flex-col items-center gap-1">
+            <div className="w-11 h-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center">
+              <Music2 className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[10px] font-semibold text-white">Music</span>
+          </button>
+
+          <button
+            onClick={() => { if (!track) { toast.error('Pehle music add karein'); return; } setMuteOriginal(m => !m); }}
+            className="flex flex-col items-center gap-1"
+          >
+            <div className="w-11 h-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center">
+              {muteOriginal && track ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+            </div>
+            <span className="text-[10px] font-semibold text-white">Audio</span>
+          </button>
+
+          <button onClick={() => setCoverPicker(true)} className="flex flex-col items-center gap-1">
+            <div className="w-11 h-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[10px] font-semibold text-white">Cover</span>
+          </button>
+
+          {track && (
+            <button onClick={() => setTrimTrack(track)} className="flex flex-col items-center gap-1">
+              <div className="w-11 h-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center">
+                <Pencil className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-[10px] font-semibold text-white">Trim</span>
+            </button>
+          )}
+        </div>
+
+        {/* Selected song chip */}
+        {track && (
+          <div className="absolute left-3 bottom-24 max-w-[65%] flex items-center gap-2 rounded-full bg-black/50 backdrop-blur px-3 py-2">
+            {track.artwork ? (
+              <img src={track.artwork} alt="" className="w-6 h-6 rounded-full object-cover" />
+            ) : <Music2 className="w-4 h-4 text-white" />}
+            <span className="text-xs text-white font-medium truncate">{track.title} · {track.artist}</span>
+            <button onClick={() => setTrack(null)} className="p-0.5"><X className="w-3.5 h-3.5 text-white/80" /></button>
+          </div>
+        )}
+
+        {/* Bottom Next */}
+        <div className="absolute bottom-0 inset-x-0 px-4 pb-7 pt-4 bg-gradient-to-t from-black/80 to-transparent">
+          <button
+            onClick={() => void goToShare()}
+            className="w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-1 active:scale-[0.98] transition-transform"
+            style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+          >
+            Next <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Cover frame picker */}
+        {coverPicker && (
+          <div className="absolute inset-x-0 bottom-0 bg-black/85 backdrop-blur px-4 pt-4 pb-8 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Cover chunein</p>
+              <button onClick={() => setCoverPicker(false)}><Check className="w-5 h-5 text-white" /></button>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(duration, 0.1)}
+              step={0.1}
+              value={coverTime}
+              onChange={e => {
+                const t = Number(e.target.value);
+                setCoverTime(t);
+                if (previewRef.current) { previewRef.current.pause(); previewRef.current.currentTime = t; setPlaying(false); }
+              }}
+              className="w-full accent-[hsl(var(--p1))]"
+            />
+            <p className="text-[11px] text-white/60">Video ke jis frame par slider rukega, wahi reel ka cover banega.</p>
+          </div>
+        )}
+
+        <MusicPickerSheet
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(selected) => { setPickerOpen(false); setTrimTrack(selected); }}
+        />
+
+        {trimTrack && videoPreview && (
+          <MusicTrimmer
+            track={trimTrack}
+            videoUrl={videoPreview}
+            initialStartMs={trimTrack.id === track?.id ? startMs : 0}
+            initialMuteOriginal={muteOriginal}
+            onBack={() => setTrimTrack(null)}
+            onDone={({ startMs: s, muteOriginal: m }) => {
+              setTrack(trimTrack);
+              setStartMs(s);
+              setMuteOriginal(m);
+              setTrimTrack(null);
+              toast.success('Music add ho gaya 🎵');
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  /* ---------------------------- STEP 3 — SHARE --------------------------- */
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
+    <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 glass-card border-b border-border/40 backdrop-blur-xl">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-muted/60 transition-colors">
+        <button onClick={() => setStep('edit')} className="p-2 rounded-full hover:bg-muted/60">
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
-        <h1 className="flex-1 text-base font-bold text-foreground">{t('newReel')}</h1>
-        <Button
-          onClick={handlePublish}
-          disabled={!videoFile || loading}
-          size="sm"
-          className="h-8 px-4 text-xs font-bold rounded-full bg-gradient-to-r from-[hsl(var(--p1))] to-[hsl(var(--p2))] text-white border-0"
-        >
-          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : t('publish')}
-        </Button>
+        <h1 className="flex-1 text-base font-bold text-foreground">New reel</h1>
       </div>
 
-      <div className="px-4 pt-6 space-y-5 max-w-lg mx-auto">
-        {/* Video picker */}
-        {!videoPreview ? (
-          <button
-            onClick={() => videoRef.current?.click()}
-            className="w-full aspect-[9/16] max-h-[60vh] rounded-2xl border-2 border-dashed border-primary/40 flex flex-col items-center justify-center gap-4 bg-muted/30 hover:bg-muted/50 transition-colors"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Film className="w-8 h-8 text-primary" />
-            </div>
-            <div className="text-center space-y-1">
-              <p className="text-sm font-semibold text-foreground">{t('uploadVideo')}</p>
-              <p className="text-xs text-muted-foreground">MP4, MOV, AVI • Max 100MB</p>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium">
-              <Upload className="w-4 h-4" />
-              {t('upload')}
-            </div>
-          </button>
-        ) : (
-          <div className="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[60vh]">
-            <video
-              src={videoPreview}
-              className="w-full h-full object-cover"
-              controls
-              playsInline
-              muted={!!track && muteOriginal}
-            />
-            <button
-              onClick={() => { setVideoFile(null); setVideoPreview(null); }}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 backdrop-blur flex items-center justify-center"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
+      <div className="px-4 pt-4 pb-32 space-y-4 max-w-lg mx-auto">
+        {/* Caption + cover */}
+        <div className="flex gap-3">
+          <div className="w-20 h-32 rounded-lg overflow-hidden bg-muted shrink-0">
+            {coverPreview ? (
+              <img src={coverPreview} alt="cover" className="w-full h-full object-cover" />
+            ) : (
+              <video src={videoPreview ?? undefined} className="w-full h-full object-cover" muted />
+            )}
           </div>
-        )}
-
-        <input
-          ref={videoRef}
-          type="file"
-          accept="video/*"
-          className="hidden"
-          onChange={handleVideoChange}
-        />
-
-        {/* Music */}
-        {!track ? (
-          <button
-            onClick={() => {
-              if (!videoPreview) { toast.error('Pehle video select karo'); return; }
-              setPickerOpen(true);
-            }}
-            className="w-full flex items-center gap-3 glass-card rounded-2xl px-4 py-3.5"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Music2 className="w-5 h-5 text-primary" />
-            </div>
-            <span className="flex-1 text-left text-sm font-semibold text-foreground">Add music</span>
-            <span className="text-xs font-bold text-primary">Search</span>
-          </button>
-        ) : (
-          <div className="glass-card rounded-2xl p-3 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg overflow-hidden bg-muted shrink-0">
-                {track.artwork ? (
-                  <img src={track.artwork} alt={track.title} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center"><Music2 className="w-5 h-5 text-muted-foreground" /></div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">{track.title}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {track.artist} · starts at {Math.floor(startMs / 1000)}s
-                </p>
-              </div>
-              <button onClick={() => setTrimTrack(track)} className="p-2 rounded-full hover:bg-muted/60">
-                <Pencil className="w-4 h-4 text-muted-foreground" />
-              </button>
-              <button onClick={() => setTrack(null)} className="p-2 rounded-full hover:bg-muted/60">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-            <button
-              onClick={() => setMuteOriginal((m) => !m)}
-              className="w-full flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2.5"
-            >
-              {muteOriginal ? <VolumeX className="w-4 h-4 text-foreground" /> : <Volume2 className="w-4 h-4 text-foreground" />}
-              <span className="flex-1 text-left text-xs font-medium text-foreground">
-                {muteOriginal ? 'Video ki original voice muted hai' : 'Video ki original voice on hai'}
-              </span>
-              <span className="text-xs font-bold text-primary">{muteOriginal ? 'Unmute' : 'Mute'}</span>
-            </button>
-            <button
-              onClick={() => setPickerOpen(true)}
-              className="w-full text-xs font-semibold text-primary py-1"
-            >
-              Change song
-            </button>
-          </div>
-        )}
-
-        {/* Caption */}
-        <div className="glass-card rounded-2xl p-4 space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('caption')}</label>
           <Textarea
             value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Write a caption for your reel... #viral #trending"
-            className="min-h-20 resize-none border-0 bg-transparent focus-visible:ring-0 px-0 text-sm"
+            onChange={e => setCaption(e.target.value)}
+            placeholder="Caption likhein… #viral #trending"
+            className="flex-1 min-h-32 resize-none text-sm"
             maxLength={500}
           />
-          <p className="text-right text-xs text-muted-foreground">{caption.length}/500</p>
         </div>
+        <p className="text-right text-xs text-muted-foreground">{caption.length}/500</p>
+
+        {/* Music summary */}
+        <div className="glass-card rounded-xl px-4 py-3 flex items-center gap-3">
+          <Music2 className="w-5 h-5 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">
+              {track ? `${track.title} · ${track.artist}` : 'Koi music nahi'}
+            </p>
+            {track && (
+              <p className="text-xs text-muted-foreground">
+                {Math.floor(startMs / 1000)}s se shuru · original audio {muteOriginal ? 'muted' : 'on'}
+              </p>
+            )}
+          </div>
+          <button onClick={() => setStep('edit')} className="text-xs font-bold text-primary">Change</button>
+        </div>
+
+        <button onClick={() => setStep('edit')} className="w-full glass-card rounded-xl px-4 py-3 flex items-center gap-3">
+          <Sparkles className="w-5 h-5 text-primary" />
+          <span className="flex-1 text-left text-sm font-semibold text-foreground">Cover badlein</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
       </div>
 
-      {/* Song search sheet */}
-      <MusicPickerSheet
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onSelect={(selected) => {
-          setPickerOpen(false);
-          setTrimTrack(selected);
-        }}
-      />
-
-      {/* Trim / set start point */}
-      {trimTrack && videoPreview && (
-        <MusicTrimmer
-          track={trimTrack}
-          videoUrl={videoPreview}
-          initialStartMs={trimTrack.id === track?.id ? startMs : 0}
-          initialMuteOriginal={muteOriginal}
-          onBack={() => setTrimTrack(null)}
-          onDone={({ startMs: s, muteOriginal: m }) => {
-            setTrack(trimTrack);
-            setStartMs(s);
-            setMuteOriginal(m);
-            setTrimTrack(null);
-            toast.success('Music added 🎵');
-          }}
-        />
-      )}
+      {/* Share bar */}
+      <div className="fixed bottom-0 inset-x-0 max-w-lg mx-auto px-4 pb-6 pt-3 bg-background/95 backdrop-blur border-t border-border/40">
+        <Button
+          onClick={handlePublish}
+          disabled={loading}
+          className="w-full h-12 font-bold rounded-xl text-white border-0"
+          style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share'}
+        </Button>
+      </div>
     </div>
   );
 };

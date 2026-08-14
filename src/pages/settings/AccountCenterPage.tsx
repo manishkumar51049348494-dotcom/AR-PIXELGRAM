@@ -15,6 +15,7 @@ import {
   type AccountIdentifier,
   type IdentifierType,
 } from '@/services/accountCenter';
+import PasswordResetSection from '@/components/settings/PasswordResetSection';
 
 /**
  * Account Center — Facebook jaisa: ek hi account me kai email aur phone number
@@ -210,6 +211,7 @@ const AccountCenterPage: React.FC = () => {
           <>
             {renderSection('email')}
             {renderSection('phone')}
+            <PasswordResetSection />
           </>
         )}
       </div>
