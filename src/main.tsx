@@ -20,19 +20,47 @@ Sentry.init({
 // (the endless "reels loading" screen). We now always purge caches, force the
 // new worker to activate, and reload once so the fresh app takes over.
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  // PWA update flow (installed app ko same URL par hi naya build milta hai):
+  //  1. har load + har baar app foreground me aane par registration.update()
+  //  2. naya worker milte hi use turant activate karo (SKIP_WAITING)
+  //  3. jab naya worker control le le, page ko ek hi baar reload karo
+  // localStorage ko kabhi clear nahi karte, isliye login session bana rehta
+  // hai — update ke baad dobara login nahi karna padta.
+  let reloadingForUpdate = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
     (async () => {
       try {
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map((k) => caches.delete(k)));
-        }
         const reg = await navigator.serviceWorker.register('/sw.js');
-        await reg.update().catch(() => { /* noop */ });
-        // No automatic window.location.reload() here: that self-refresh was
-        // what made the app jump to a stuck loading screen ~1s after opening.
-        // Caches are already purged above and the new worker claims clients,
-        // so the fresh build is used from the next navigation onwards.
+
+        const promote = (worker: ServiceWorker | null) => {
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              worker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        };
+
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        promote(reg.installing);
+        reg.addEventListener('updatefound', () => promote(reg.installing));
+
+        const checkForUpdate = () => { reg.update().catch(() => { /* noop */ }); };
+        checkForUpdate();
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') checkForUpdate();
+        });
+        // Lambi chalne wali installed app ke liye periodic check.
+        setInterval(checkForUpdate, 60 * 60 * 1000);
       } catch {
         /* noop */
       }
