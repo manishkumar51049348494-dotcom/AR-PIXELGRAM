@@ -54,17 +54,19 @@ const ReelCommentsSheet: React.FC<Props> = ({ reelId, reelOwnerId, open, onClose
     if (!content.trim() || !user) return;
     setLoading(true);
     try {
-      await addReelComment(reelId, content.trim(), replyTo?.id || null);
-      // notifications
-      if (replyTo && replyTo.user_id !== user.id) {
-        await createNotification(replyTo.user_id, 'comment_reply', user.id, reelId, replyTo.id, content.trim().slice(0, 120));
-      } else if (!replyTo && reelOwnerId !== user.id) {
-        await createNotification(reelOwnerId, 'reel_comment', user.id, reelId, undefined, content.trim().slice(0, 120));
-      }
+      const text = content.trim();
+      await addReelComment(reelId, text, replyTo?.id || null);
       setContent('');
+      const wasReply = replyTo;
       setReplyTo(null);
+      toast.success(wasReply ? 'Reply added' : 'Comment added');
+      // Notification bhejna optional hai — fail ho to comment fail nahi hona chahiye.
+      if (wasReply && wasReply.user_id !== user.id) {
+        createNotification(wasReply.user_id, 'comment_reply', user.id, reelId, wasReply.id, text.slice(0, 120)).catch(() => {});
+      } else if (!wasReply && reelOwnerId !== user.id) {
+        createNotification(reelOwnerId, 'reel_comment', user.id, reelId, undefined, text.slice(0, 120)).catch(() => {});
+      }
       await refresh();
-      toast.success(replyTo ? 'Reply added' : 'Comment added');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Comment save nahi hua');
     } finally { setLoading(false); }
