@@ -61,8 +61,9 @@ async function sendEmailOtp(to: string, code: string) {
     }),
   });
   if (!res.ok) {
-    console.error('resend error', await res.text());
-    throw new Error('email_send_failed');
+    const detail = await res.text();
+    console.error('resend error', detail);
+    throw new Error(`email_send_failed: ${detail.slice(0, 300)}`);
   }
 }
 
@@ -85,8 +86,9 @@ async function sendSmsOtp(to: string, code: string) {
     body,
   });
   if (!res.ok) {
-    console.error('twilio error', await res.text());
-    throw new Error('sms_send_failed');
+    const detail = await res.text();
+    console.error('twilio error', detail);
+    throw new Error(`sms_send_failed: ${detail.slice(0, 300)}`);
   }
 }
 
@@ -175,7 +177,7 @@ Deno.serve(async (req) => {
       return json({ error: 'SMS OTP service abhi setup nahi hai (Twilio keys missing).' }, 500);
     }
     if (message.includes('send_failed')) {
-      return json({ error: 'OTP bhejne me dikkat aayi. Thodi der baad try karein.' }, 502);
+      return json({ error: `OTP bhejne me dikkat aayi: ${message.replace(/^.*send_failed:\s*/, '').slice(0, 300)}` }, 502);
     }
     return json({ error: 'Kuch galat ho gaya. Dobara try karein.' }, 500);
   }
