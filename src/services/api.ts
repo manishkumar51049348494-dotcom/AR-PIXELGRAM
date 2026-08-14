@@ -62,6 +62,17 @@ export async function createPost(imageUrl: string, caption: string | null): Prom
   await supabase.from('posts').insert({ image_url: imageUrl, caption });
 }
 
+// posts.user_id ka foreign key auth.users par hai, profiles par nahi — isliye
+// PostgREST ka embedded join (profiles!posts_user_id_fkey) fail ho jata tha aur
+// poora feed khaali aata tha. Profiles ko alag query se attach karte hain.
+async function attachProfiles<T extends { user_id: string }>(rows: T[]): Promise<(T & { profile?: Profile })[]> {
+  if (rows.length === 0) return [];
+  const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
+  const { data: profiles } = await supabase.from('profiles').select('*').in('user_id', userIds);
+  const map = Object.fromEntries((profiles || []).map((pr: Profile) => [pr.user_id, pr]));
+  return rows.map(r => ({ ...r, profile: map[r.user_id] }));
+}
+
 // Attaches real like/comment counts + is_liked/is_saved to a batch of posts.
 // posts.likes_count/comments_count were never populated anywhere before —
 // PostCard always showed 0, since there's no denormalized count column;
@@ -97,11 +108,11 @@ async function attachPostSocialMeta(rows: Post[], currentUserId?: string): Promi
 export async function getPostById(postId: string, currentUserId?: string): Promise<Post | null> {
   const { data, error } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey(*)')
+    .select('*')
     .eq('id', postId)
     .maybeSingle();
   if (error || !data) return null;
-  const post = { ...data, profile: data.profiles } as Post;
+  const [post] = await attachProfiles([data as Post]);
   const [withMeta] = await attachPostSocialMeta([post], currentUserId);
   return withMeta;
 }
@@ -120,12 +131,12 @@ export async function getHomeFeed(userId: string, page = 0, pageSize = 10): Prom
 
   const { data } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey(*)')
+    .select('*')
     .in('user_id', feedIds)
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
 
-  const posts = Array.isArray(data) ? data.map(p => ({ ...p, profile: p.profiles })) : [];
+  const posts = await attachProfiles(Array.isArray(data) ? (data as Post[]) : []);
   return attachPostSocialMeta(posts, userId);
 }
 
@@ -136,7 +147,7 @@ export async function getUserPosts(userId: string, currentUserId?: string): Prom
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
-  const posts = Array.isArray(data) ? data : [];
+  const posts = await attachProfiles(Array.isArray(data) ? (data as Post[]) : []);
   return attachPostSocialMeta(posts, currentUserId);
 }
 
@@ -145,12 +156,13 @@ export async function deletePost(postId: string): Promise<void> {
 }
 
 export async function getAllPosts(page = 0, pageSize = 20, currentUserId?: string): Promise<Post[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey(*)')
+    .select('*')
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
-  const posts = Array.isArray(data) ? data.map(p => ({ ...p, profile: p.profiles })) : [];
+  if (error) throw error;
+  const posts = await attachProfiles(Array.isArray(data) ? (data as Post[]) : []);
   return attachPostSocialMeta(posts, currentUserId);
 }
 
@@ -175,17 +187,21 @@ export async function isLiked(postId: string, userId: string): Promise<boolean> 
 
 // ===================== COMMENTS =====================
 export async function addComment(postId: string, content: string): Promise<void> {
-  await supabase.from('comments').insert({ post_id: postId, content });
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) throw new Error('Comment karne ke liye login karein');
+  const { error } = await supabase.from('comments').insert({ post_id: postId, user_id: uid, content });
+  if (error) throw error;
 }
 
 export async function getComments(postId: string): Promise<Comment[]> {
   const { data } = await supabase
     .from('comments')
-    .select('*, profiles!comments_user_id_fkey(*)')
+    .select('*')
     .eq('post_id', postId)
     .order('created_at', { ascending: true })
     .limit(50);
-  return Array.isArray(data) ? data.map(c => ({ ...c, profile: c.profiles })) : [];
+  return attachProfiles(Array.isArray(data) ? (data as Comment[]) : []) as Promise<Comment[]>;
 }
 
 export async function deleteComment(commentId: string): Promise<void> {
@@ -1061,11 +1077,12 @@ export async function getReelComments(reelId: string): Promise<ReelComment[]> {
 }
 
 export async function addReelComment(reelId: string, content: string, parentId?: string | null): Promise<void> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('Sign in to comment');
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) throw new Error('Comment karne ke liye login karein');
   const { error } = await supabase.from('reel_comments').insert({
     reel_id: reelId,
-    user_id: userData.user.id,
+    user_id: uid,
     content,
     parent_id: parentId || null,
   });
