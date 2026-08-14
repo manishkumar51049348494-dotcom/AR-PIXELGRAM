@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { BadgeCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface CommentsSheetProps {
   postId: string;
@@ -36,14 +37,21 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
     e.preventDefault();
     if (!content.trim() || !user) return;
     setLoading(true);
-    await addComment(postId, content.trim());
-    if (postOwnerId !== user.id) {
-      await createNotification(postOwnerId, 'comment', user.id, postId);
+    try {
+      const text = content.trim();
+      await addComment(postId, text);
+      setContent('');
+      toast.success('Comment added');
+      if (postOwnerId !== user.id) {
+        createNotification(postOwnerId, 'comment', user.id, postId).catch(() => {});
+      }
+      const updated = await getComments(postId);
+      setComments(updated);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Comment save nahi hua');
+    } finally {
+      setLoading(false);
     }
-    const updated = await getComments(postId);
-    setComments(updated);
-    setContent('');
-    setLoading(false);
   };
 
   if (!open) return null;
