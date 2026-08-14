@@ -1,5 +1,20 @@
 import { supabase } from '@/db/supabase';
 
+/** Edge function ke error response se asli message nikalta hai. */
+async function extractError(error: unknown, fallback: string): Promise<string> {
+  const ctx = (error as { context?: Response } | null)?.context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = (await ctx.clone().json()) as { error?: string };
+      if (body?.error) return body.error;
+    } catch {
+      /* ignore */
+    }
+  }
+  const msg = (error as { message?: string } | null)?.message;
+  return msg && !/non-2xx/i.test(msg) ? msg : fallback;
+}
+
 export interface ResetStart {
   found: boolean;
   token?: string;
@@ -12,8 +27,10 @@ export async function startPasswordReset(identifier: string): Promise<ResetStart
     body: { identifier: identifier.trim() },
   });
   if (error) {
-    const message = (data as { error?: string } | null)?.error;
-    throw new Error(message || 'OTP bhejne me dikkat aayi. Dobara try karein.');
+    throw new Error(
+      (data as { error?: string } | null)?.error ||
+        (await extractError(error, 'OTP bhejne me dikkat aayi. Dobara try karein.')),
+    );
   }
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
   return data as ResetStart;
@@ -25,8 +42,10 @@ export async function confirmPasswordReset(token: string, code: string, password
     body: { token, code: code.trim(), password },
   });
   if (error) {
-    const message = (data as { error?: string } | null)?.error;
-    throw new Error(message || 'OTP verify nahi hua. Dobara try karein.');
+    throw new Error(
+      (data as { error?: string } | null)?.error ||
+        (await extractError(error, 'OTP verify nahi hua. Dobara try karein.')),
+    );
   }
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
 }
