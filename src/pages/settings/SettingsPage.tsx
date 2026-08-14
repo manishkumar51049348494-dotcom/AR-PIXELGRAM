@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, BellRing, KeyRound, AtSign } from 'lucide-react';
+import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, KeyRound, AtSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
@@ -228,7 +228,6 @@ const SettingsPage: React.FC = () => {
 
         {/* Menu items */}
         {[
-          { icon: BellRing, label: 'Enable Notifications', desc: 'Calls & messages ke alerts', onClick: () => navigate('/settings/notifications'), danger: false },
           { icon: KeyRound, label: 'Change Password', desc: 'OTP se apna password reset karo', onClick: () => navigate('/forgot-password'), danger: false },
           { icon: BadgeCheck, label: 'Request Verification', desc: profile?.is_verified ? 'Already verified ✓' : 'Get the blue badge', onClick: () => setSection('verification'), danger: false },
           { icon: AtSign, label: 'Account Center', desc: 'Email aur phone number add/manage karein', onClick: () => navigate('/settings/account-center'), danger: false },
