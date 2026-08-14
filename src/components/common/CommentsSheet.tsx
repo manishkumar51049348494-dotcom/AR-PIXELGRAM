@@ -33,7 +33,11 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
   useEffect(() => {
     if (open) {
       getComments(postId).then(setComments);
+      // Sheet khulte hi comment box par focus — user turant type kar sake.
+      const t = setTimeout(() => inputRef.current?.focus(), 200);
+      return () => clearTimeout(t);
     }
+    return undefined;
   }, [postId, open]);
 
   useEffect(() => {
@@ -86,10 +90,10 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div
-        className="relative w-full max-w-lg bg-card rounded-t-2xl flex flex-col"
+        className="relative z-[101] w-full max-w-lg bg-card rounded-t-2xl flex flex-col"
         style={{
           // Keyboard ke barabar upar shift + utni hi height kam.
           bottom: keyboardInset,
