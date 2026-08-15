@@ -31,7 +31,9 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloadingForUpdate) return;
     reloadingForUpdate = true;
-    window.location.reload();
+    // Auth client ko persisted session write/refresh complete karne ka ek pal
+    // do; turant reload se kuch Android WebViews me session restore race hoti thi.
+    window.setTimeout(() => window.location.reload(), 500);
   });
 
   window.addEventListener('load', () => {
