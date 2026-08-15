@@ -1,4 +1,4 @@
-# Welcome to Your Miaoda Project
+# Welcome to Your AR PIXELGRAM Project
 
 ## Project Info
 
