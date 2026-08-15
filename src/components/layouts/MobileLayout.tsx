@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import LanguageSelector from '@/components/common/LanguageSelector';
 import InstallAppButton from '@/components/common/InstallAppButton';
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -19,8 +20,9 @@ interface MobileLayoutProps {
 const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, fullscreen = false }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { t } = useLanguage();
+  const unreadNotifications = useUnreadNotifications(user?.id);
 
   // fullscreen mode — reels की तरह pure black, no header, no nav
   if (fullscreen) {
@@ -83,6 +85,11 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
           {/* Notifications */}
           <Link to="/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
             <Bell className="w-5 h-5 text-foreground" />
+            {unreadNotifications > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 h-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-background">
+                {unreadNotifications > 99 ? '99+' : unreadNotifications}
+              </span>
+            )}
           </Link>
         </div>
       </header>
