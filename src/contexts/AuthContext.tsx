@@ -64,18 +64,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null);
+      setLoading(false);
       if (session?.user) {
         const p = await getProfileWithRetry(session.user.id);
         if (p) setProfile(p);
       }
-      setLoading(false);
     }).catch((e) => {
       console.error('getSession failed', e);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Deploy/service-worker reload ke dauran transient null callbacks ko logout
+      // mat samjho. User ko sirf Supabase ke explicit SIGNED_OUT event par hatao.
+      if (session?.user) setUser(session.user);
+      else if (event === 'SIGNED_OUT') setUser(null);
       if (session?.user) {
         const userId = session.user.id;
         // Supabase auth callback ke andar await karke koi database/auth request
@@ -88,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             })
             .catch((e) => console.error('auth profile refresh failed', e));
         }, 0);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         setProfile(null);
       }
       setLoading(false);
