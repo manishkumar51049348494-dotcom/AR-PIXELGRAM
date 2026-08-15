@@ -1,51 +1,45 @@
 import { supabase } from '@/db/supabase';
 
-/** Edge function ke error response se asli message nikalta hai. */
-async function extractError(error: unknown, fallback: string): Promise<string> {
-  const ctx = (error as { context?: Response } | null)?.context;
-  if (ctx && typeof ctx.json === 'function') {
-    try {
-      const body = (await ctx.clone().json()) as { error?: string };
-      if (body?.error) return body.error;
-    } catch {
-      /* ignore */
-    }
-  }
-  const msg = (error as { message?: string } | null)?.message;
-  return msg && !/non-2xx/i.test(msg) ? msg : fallback;
-}
-
 export interface ResetStart {
   found: boolean;
   token?: string;
   masked?: string;
 }
 
-/** Step 1 — account dhoondh kar uske email par 6-digit OTP bhejta hai (koi link nahi). */
-export async function startPasswordReset(identifier: string): Promise<ResetStart> {
-  const { data, error } = await supabase.functions.invoke('password-reset-start', {
-    body: { identifier: identifier.trim() },
-  });
-  if (error) {
-    throw new Error(
-      (data as { error?: string } | null)?.error ||
-        (await extractError(error, 'OTP bhejne me dikkat aayi. Dobara try karein.')),
-    );
-  }
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-  return data as ResetStart;
+function maskEmail(email: string): string {
+  const [name, domain] = email.split('@');
+  if (!domain) return email;
+  const visible = name.length <= 2
+    ? name.slice(0, 1)
+    : `${name.slice(0, 1)}${'*'.repeat(Math.max(1, name.length - 2))}${name.slice(-1)}`;
+  return `${visible}@${domain}`;
 }
 
-/** Step 2 — OTP verify karke naya password set karta hai. */
-export async function confirmPasswordReset(token: string, code: string, password: string): Promise<void> {
-  const { data, error } = await supabase.functions.invoke('password-reset-confirm', {
-    body: { token, code: code.trim(), password },
-  });
-  if (error) {
-    throw new Error(
-      (data as { error?: string } | null)?.error ||
-        (await extractError(error, 'OTP verify nahi hua. Dobara try karein.')),
-    );
+/**
+ * Sends the built-in recovery OTP directly. This avoids depending on the
+ * separately deployed password-reset-start function.
+ */
+export async function startPasswordReset(identifier: string): Promise<ResetStart> {
+  const email = identifier.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Password reset ke liye account ka email daalein');
   }
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) throw new Error(error.message);
+
+  return { found: true, token: email, masked: maskEmail(email) };
+}
+
+/** Verifies the email recovery OTP and updates the password. */
+export async function confirmPasswordReset(token: string, code: string, password: string): Promise<void> {
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    email: token,
+    token: code.trim(),
+    type: 'recovery',
+  });
+  if (verifyError) throw new Error(verifyError.message);
+
+  const { error: updateError } = await supabase.auth.updateUser({ password });
+  if (updateError) throw new Error(updateError.message);
 }
