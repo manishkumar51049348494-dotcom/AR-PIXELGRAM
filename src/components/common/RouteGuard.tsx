@@ -31,10 +31,11 @@ export function RouteGuard({ children }: RouteGuardProps) {
   const location = useLocation();
   const [timedOut, setTimedOut] = React.useState(false);
 
-  // Max 1.5s loading timeout — never hang forever
+  // Stored session restore ko update/reload ke waqt poora hone do. Chhota timeout
+  // valid logged-in users ko galti se login page par bhej raha tha.
   React.useEffect(() => {
     if (!loading) return;
-    const t = setTimeout(() => setTimedOut(true), 1500);
+    const t = setTimeout(() => setTimedOut(true), 10000);
     return () => clearTimeout(t);
   }, [loading]);
 
