@@ -18,6 +18,7 @@ import AccountCenterPage from './pages/settings/AccountCenterPage';
 import NotificationSettingsPage from './pages/settings/NotificationSettingsPage';
 import ReelsPage from './pages/reels/ReelsPage';
 import CreateReelPage from './pages/reels/CreateReelPage';
+import SongPage from './pages/music/SongPage';
 import PeoplePage from './pages/people/PeoplePage';
 import ReportUserPage from './pages/report/ReportUserPage';
 import AppealPage from './pages/appeal/AppealPage';
@@ -58,6 +59,7 @@ export const routes: RouteConfig[] = [
   { name: 'Stories', path: '/stories', element: <StoriesPage /> },
   { name: 'Reels', path: '/reels', element: <ReelsPage /> },
   { name: 'Create Reel', path: '/create-reel', element: <CreateReelPage /> },
+  { name: 'Song', path: '/song/:trackId', element: <SongPage /> },
   { name: 'People', path: '/people', element: <PeoplePage /> },
   { name: 'Chat', path: '/chat', element: <ChatListPage /> },
   { name: 'Chat Conversation', path: '/chat/:receiverId', element: <ChatPage /> },

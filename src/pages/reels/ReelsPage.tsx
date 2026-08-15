@@ -265,7 +265,14 @@ const ReelCard: React.FC<{
 
       {/* Bottom info */}
       <div className="absolute left-0 right-16 bottom-24 px-4 space-y-2">
+        {/* Instagram jaisa — profile photo + username ek saath */}
         <button onClick={() => navigate(`/profile/${profile?.user_id}`)} className="flex items-center gap-2">
+          <Avatar className="w-8 h-8 border border-white/70">
+            <AvatarImage src={profile?.avatar_url} />
+            <AvatarFallback className="bg-primary text-primary-foreground text-[11px] font-bold">
+              {profile?.username?.[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           <span className="text-white font-bold text-sm">@{profile?.username}</span>
           {profile?.is_verified && <span className="text-primary text-xs">✓</span>}
         </button>
@@ -277,8 +284,13 @@ const ReelCard: React.FC<{
             👁 {viewsCount > 999 ? `${(viewsCount / 1000).toFixed(1)}k` : viewsCount} views
           </p>
         )}
-        {/* Music info — Instagram jaisa */}
-        <div className="flex items-center gap-2 mt-1">
+        {/* Music info — Instagram jaisa, tap karo to song page khulta hai */}
+        <button
+          type="button"
+          disabled={!hasMusic || !reel.music_track_id}
+          onClick={() => { if (reel.music_track_id) navigate(`/song/${reel.music_track_id}`); }}
+          className="flex items-center gap-2 mt-1 max-w-full rounded-full bg-black/30 backdrop-blur px-2 py-1 disabled:opacity-100"
+        >
           {hasMusic && reel.music_artwork_url ? (
             <img
               src={reel.music_artwork_url}
@@ -290,11 +302,12 @@ const ReelCard: React.FC<{
               <span className="text-xs">♪</span>
             </div>
           )}
-          <span className="text-white/85 text-xs truncate max-w-[65%]">
+          <span className="text-white/85 text-xs truncate max-w-[60%]">
             {hasMusic ? `${reel.music_title} · ${reel.music_artist}` : 'AR Pixelgram Reel'}
           </span>
-        </div>
+        </button>
       </div>
+
 
       {/* Comments sheet */}
       <ReelCommentsSheet

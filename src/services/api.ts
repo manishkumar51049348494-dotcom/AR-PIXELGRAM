@@ -1101,3 +1101,43 @@ export async function getReelCommentsCount(reelId: string): Promise<number> {
   return count || 0;
 }
 
+
+// ===================== STORY VIEWERS (Instagram-style) =====================
+export interface StoryViewer {
+  profile: Profile;
+  viewed_at: string;
+  liked: boolean;
+}
+
+/** Story par kis-kis ne dekha (aur unme se kisne like kiya) — owner ke liye. */
+export async function getStoryViewers(storyId: string): Promise<StoryViewer[]> {
+  const [viewsRes, likesRes] = await Promise.all([
+    supabase
+      .from('story_views')
+      .select('created_at, profiles!story_views_viewer_id_fkey(*)')
+      .eq('story_id', storyId)
+      .order('created_at', { ascending: false }),
+    supabase.from('story_likes').select('user_id').eq('story_id', storyId),
+  ]);
+  const likedSet = new Set(((likesRes.data as { user_id: string }[] | null) || []).map(l => l.user_id));
+  const rows = (viewsRes.data as any[] | null) || [];
+  return rows
+    .map(r => ({
+      profile: r.profiles as Profile,
+      viewed_at: r.created_at as string,
+      liked: likedSet.has(r.profiles?.user_id),
+    }))
+    .filter(v => !!v.profile);
+}
+
+// ===================== SONG / MUSIC PAGE =====================
+/** Ek gaane par bane saare reels (sabse purana pehle — original creator pata chale). */
+export async function getReelsByMusic(trackId: string): Promise<Reel[]> {
+  const { data, error } = await supabase
+    .from('reels')
+    .select('*, profile:profiles(id, user_id, username, full_name, avatar_url, is_verified)')
+    .eq('music_track_id', trackId)
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return (data || []) as Reel[];
+}
