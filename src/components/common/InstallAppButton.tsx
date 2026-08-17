@@ -27,6 +27,11 @@ const InstallAppButton: React.FC<{ className?: string; label?: string }> = ({ cl
   const isIos =
     typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
 
+  const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+
+  // Signed APK jo repo ke public/ folder se serve hota hai.
+  const APK_URL = '/AR-Pixelgram.apk';
+
   useEffect(() => {
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -45,10 +50,19 @@ const InstallAppButton: React.FC<{ className?: string; label?: string }> = ({ cl
     };
   }, []);
 
-  if (isStandalone) return null;
-  if (!canInstall && !isIos) return null;
+  if (isStandalone && !isAndroid) return null;
 
   const handleClick = async () => {
+    if (isAndroid) {
+      // Android par seedha real signed APK download hota hai.
+      const a = document.createElement('a');
+      a.href = APK_URL;
+      a.download = 'AR-Pixelgram.apk';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    }
     if (deferredPrompt) {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
@@ -72,7 +86,7 @@ const InstallAppButton: React.FC<{ className?: string; label?: string }> = ({ cl
         style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
       >
         <Download className="w-4 h-4" />
-        {label}
+        {isAndroid ? 'Download APK' : label}
       </button>
 
       {iosHelp && (

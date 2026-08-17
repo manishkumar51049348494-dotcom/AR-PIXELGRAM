@@ -1,0 +1,8 @@
+{
+	"appId": "com.arpixelgram.app",
+	"appName": "AR Pixelgram",
+	"webDir": "dist",
+	"android": {
+		"allowMixedContent": true
+	}
+}
