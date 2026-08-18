@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   X,
@@ -8,8 +8,7 @@ import {
   Eye,
   Loader2,
   Music2,
-  Play,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   getVideoDetails,
   getComments,
@@ -21,8 +20,8 @@ import {
   type YouTubeComment,
   type YouTubeItem,
   type YouTubeKind,
-} from '@/services/youtube';
-import { cn } from '@/lib/utils';
+} from "@/services/youtube";
+import { cn } from "@/lib/utils";
 
 interface YouTubeWatchProps {
   item: YouTubeItem;
@@ -38,12 +37,17 @@ interface YouTubeWatchProps {
  * नीचे title, views, likes, description, comments और related गाने scroll करके.
  * ऊपर के arrow से player छोटा (mini) हो जाता है, tap करने पर फिर बड़ा.
  */
-const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClose }) => {
+const YouTubeWatch: React.FC<YouTubeWatchProps> = ({
+  item,
+  kind,
+  onSelect,
+  onClose,
+}) => {
   const [mini, setMini] = useState(false);
   const [details, setDetails] = useState<YouTubeDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [descOpen, setDescOpen] = useState(false);
-  const [tab, setTab] = useState<'related' | 'comments'>('related');
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<YouTubeComment[] | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [dlOpen, setDlOpen] = useState(false);
@@ -60,7 +64,7 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
     setDetails(null);
     setComments(null);
     setDescOpen(false);
-    setTab('related');
+    setCommentsOpen(false);
     setDlOpen(false);
     getVideoDetails(item, kind, ac.signal)
       .then((d) => {
@@ -73,7 +77,7 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
   }, [item, kind]);
 
   useEffect(() => {
-    if (tab !== 'comments' || comments) return;
+    if (!commentsOpen || comments) return;
     const ac = new AbortController();
     setCommentsLoading(true);
     getComments(item.id, ac.signal)
@@ -84,16 +88,22 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
         if (!ac.signal.aborted) setCommentsLoading(false);
       });
     return () => ac.abort();
-  }, [tab, comments, item.id]);
+  }, [commentsOpen, comments, item.id]);
 
-  const downloads = [...(details?.audioDownloads || []), ...(details?.videoDownloads || [])];
+  const downloads = [
+    ...(details?.audioDownloads || []),
+    ...(details?.videoDownloads || []),
+  ];
 
   /* ------------------------------ MINI PLAYER ------------------------------ */
   if (mini) {
     return (
       <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 w-full max-w-lg z-[70] px-2">
         <div className="flex items-center gap-2 rounded-2xl overflow-hidden bg-card border border-border shadow-xl">
-          <div className="relative w-[110px] shrink-0 bg-black" style={{ aspectRatio: '16 / 9' }}>
+          <div
+            className="relative w-[110px] shrink-0 bg-black"
+            style={{ aspectRatio: "16 / 9" }}
+          >
             <iframe
               src={src}
               title={item.title}
@@ -102,9 +112,17 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
               allowFullScreen
             />
           </div>
-          <button type="button" onClick={() => setMini(false)} className="flex-1 min-w-0 text-left py-2">
-            <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
-            <p className="text-[10px] text-muted-foreground truncate">{item.channel}</p>
+          <button
+            type="button"
+            onClick={() => setMini(false)}
+            className="flex-1 min-w-0 text-left py-2"
+          >
+            <p className="text-xs font-semibold text-foreground truncate">
+              {item.title}
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {item.channel}
+            </p>
           </button>
           <button
             onClick={onClose}
@@ -131,7 +149,7 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
           <ChevronDown className="w-5 h-5 text-foreground" />
         </button>
         <p className="flex-1 min-w-0 text-xs font-semibold text-muted-foreground truncate">
-          {kind === 'audio' ? 'गाना चल रहा है' : 'वीडियो चल रहा है'}
+          {kind === "audio" ? "गाना चल रहा है" : "वीडियो चल रहा है"}
         </p>
         <button
           onClick={onClose}
@@ -143,7 +161,10 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
       </div>
 
       {/* player — seek, pause, fullscreen सब YouTube के controls से */}
-      <div className="relative w-full bg-black shrink-0" style={{ aspectRatio: '16 / 9' }}>
+      <div
+        className="relative w-full bg-black shrink-0"
+        style={{ aspectRatio: "16 / 9" }}
+      >
         <iframe
           src={src}
           title={item.title}
@@ -156,7 +177,9 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
       {/* scrollable info + related */}
       <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
         <div className="p-3">
-          <h1 className="text-sm font-bold text-foreground leading-snug">{details?.title || item.title}</h1>
+          <h1 className="text-sm font-bold text-foreground leading-snug">
+            {details?.title || item.title}
+          </h1>
           <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
             {(details?.views ?? item.views) ? (
               <span className="flex items-center gap-1">
@@ -170,13 +193,19 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
                 {formatCount(details.likes)}
               </span>
             ) : null}
-            {details?.uploaded ? <span>{String(details.uploaded).slice(0, 10)}</span> : null}
+            {details?.uploaded ? (
+              <span>{String(details.uploaded).slice(0, 10)}</span>
+            ) : null}
           </div>
 
           {/* channel + download */}
           <div className="flex items-center gap-2 mt-3">
             {details?.channelAvatar ? (
-              <img src={details.channelAvatar} alt={details.channel} className="w-8 h-8 rounded-full object-cover" />
+              <img
+                src={details.channelAvatar}
+                alt={details.channel}
+                className="w-8 h-8 rounded-full object-cover"
+              />
             ) : (
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                 <Music2 className="w-4 h-4 text-primary" />
@@ -189,7 +218,10 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
               type="button"
               onClick={() => setDlOpen((v) => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+              style={{
+                background:
+                  "linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))",
+              }}
             >
               <Download className="w-3.5 h-3.5" />
               डाउनलोड
@@ -201,25 +233,33 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
             <div className="mt-2 rounded-xl border border-border/60 divide-y divide-border/50 overflow-hidden">
               {loading ? (
                 <div className="flex items-center gap-2 p-3 text-xs text-muted-foreground">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> लिंक तैयार हो रहे हैं…
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> लिंक तैयार हो
+                  रहे हैं…
                 </div>
               ) : downloads.length === 0 ? (
                 <p className="p-3 text-xs text-muted-foreground">
-                  इस वीडियो के लिए download लिंक नहीं मिला — थोड़ी देर बाद दोबारा कोशिश करें.
+                  इस वीडियो के लिए download लिंक नहीं मिला — थोड़ी देर बाद
+                  दोबारा कोशिश करें.
                 </p>
               ) : (
                 downloads.map((d, i) => (
                   <button
                     key={`${d.url}-${i}`}
                     type="button"
-                    onClick={() => startDownload(d, details?.title || item.title)}
+                    onClick={() =>
+                      startDownload(d, details?.title || item.title)
+                    }
                     className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted"
                   >
                     <Download className="w-4 h-4 text-primary shrink-0" />
                     <span className="flex-1 text-xs font-medium text-foreground">
-                      {d.kind === 'audio' ? 'MP3 / Audio' : 'Video'} · {d.label}
+                      {d.kind === "audio" ? "MP3 / Audio" : "Video"} · {d.label}
                     </span>
-                    {d.sizeMb ? <span className="text-[10px] text-muted-foreground">{d.sizeMb} MB</span> : null}
+                    {d.sizeMb ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {d.sizeMb} MB
+                      </span>
+                    ) : null}
                   </button>
                 ))
               )}
@@ -233,106 +273,124 @@ const YouTubeWatch: React.FC<YouTubeWatchProps> = ({ item, kind, onSelect, onClo
               onClick={() => setDescOpen((v) => !v)}
               className="w-full text-left mt-3 p-3 rounded-xl bg-muted/50"
             >
-              <p className="text-[11px] font-semibold text-foreground mb-1">Description</p>
-              <p className={cn('text-[11px] text-muted-foreground whitespace-pre-line', !descOpen && 'line-clamp-3')}>
+              <p className="text-[11px] font-semibold text-foreground mb-1">
+                Description
+              </p>
+              <p
+                className={cn(
+                  "text-[11px] text-muted-foreground whitespace-pre-line",
+                  !descOpen && "line-clamp-3",
+                )}
+              >
                 {details.description}
               </p>
               <span className="text-[10px] text-primary font-semibold">
-                {descOpen ? 'कम दिखाओ' : 'और पढ़ें'}
+                {descOpen ? "कम दिखाओ" : "और पढ़ें"}
               </span>
             </button>
           ) : null}
         </div>
 
-        {/* tabs: related / comments */}
-        <div className="flex items-center gap-2 px-3 pb-2 border-b border-border/50">
-          {([
-            { key: 'related' as const, label: kind === 'audio' ? 'और गाने' : 'और वीडियो', icon: Play },
-            { key: 'comments' as const, label: 'Comments', icon: MessageCircle },
-          ]).map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
-                tab === key ? 'text-white border-transparent' : 'text-muted-foreground border-border/60',
-              )}
-              style={tab === key ? { background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' } : {}}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
+        <div className="px-3 py-3 border-y border-border/50">
+          <button
+            type="button"
+            onClick={() => setCommentsOpen((value) => !value)}
+            className="flex items-center gap-2 text-xs font-semibold text-foreground"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Comments
+          </button>
         </div>
 
-        {tab === 'related' ? (
-          <div className="p-2 space-y-1">
-            {loading && !details ? (
-              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-xs">
-                <Loader2 className="w-4 h-4 animate-spin" /> लोड हो रहा है…
-              </div>
-            ) : (details?.related.length || 0) === 0 ? (
-              <p className="text-center py-10 text-xs text-muted-foreground">कुछ नहीं मिला</p>
-            ) : (
-              details!.related.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => onSelect(r)}
-                  className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-muted transition-colors"
-                >
-                  <div className="relative w-[110px] shrink-0 rounded-lg overflow-hidden bg-muted" style={{ aspectRatio: '16 / 9' }}>
-                    <img src={r.thumbnail} alt={r.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-                    {r.durationSec > 0 && (
-                      <span className="absolute bottom-1 right-1 px-1 rounded bg-black/80 text-white text-[9px] font-semibold">
-                        {formatYouTubeDuration(r.durationSec)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground line-clamp-2">{r.title}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{r.channel}</p>
-                    {r.views ? <p className="text-[10px] text-muted-foreground">{formatViews(r.views)}</p> : null}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        ) : (
+        {commentsOpen ? (
           <div className="p-3 space-y-3">
             {commentsLoading ? (
               <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-xs">
                 <Loader2 className="w-4 h-4 animate-spin" /> comments आ रहे हैं…
               </div>
             ) : (comments?.length || 0) === 0 ? (
-              <p className="text-center py-10 text-xs text-muted-foreground">Comments उपलब्ध नहीं</p>
+              <p className="text-center py-10 text-xs text-muted-foreground">
+                Comments उपलब्ध नहीं
+              </p>
             ) : (
-              comments!.map((c) => (
-                <div key={c.id} className="flex gap-2">
-                  {c.avatar ? (
-                    <img src={c.avatar} alt={c.author} loading="lazy" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-primary">{c.author[0]?.toUpperCase()}</span>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
+              comments?.map((comment) => (
+                <div key={comment.id} className="flex gap-2">
+                  {comment.avatar ? (
+                    <img
+                      src={comment.avatar}
+                      alt={comment.author}
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                  ) : null}
+                  <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground">
-                      {c.author} {c.time ? `· ${c.time}` : ''}
+                      {comment.author} {comment.time ? `· ${comment.time}` : ""}
                     </p>
-                    <p className="text-xs text-foreground whitespace-pre-line break-words">{c.text}</p>
-                    {c.likes ? (
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <ThumbsUp className="w-3 h-3" /> {formatCount(c.likes)}
-                      </p>
-                    ) : null}
+                    <p className="text-xs text-foreground whitespace-pre-line break-words">
+                      {comment.text}
+                    </p>
                   </div>
                 </div>
               ))
             )}
           </div>
-        )}
+        ) : null}
+
+        <div className="px-3 pt-4 pb-1">
+          <h2 className="text-sm font-bold text-foreground">
+            {kind === "audio" ? "अगले गाने" : "अगले वीडियो"}
+          </h2>
+        </div>
+        <div className="p-2 space-y-1">
+          {loading && !details ? (
+            <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-xs">
+              <Loader2 className="w-4 h-4 animate-spin" /> लोड हो रहा है…
+            </div>
+          ) : (details?.related.length || 0) === 0 ? (
+            <p className="text-center py-10 text-xs text-muted-foreground">
+              अगले वीडियो नहीं मिले
+            </p>
+          ) : (
+            details?.related.map((related) => (
+              <button
+                key={related.id}
+                type="button"
+                onClick={() => onSelect(related)}
+                className="w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-muted"
+              >
+                <div
+                  className="relative w-[140px] shrink-0 rounded-lg overflow-hidden bg-muted"
+                  style={{ aspectRatio: "16 / 9" }}
+                >
+                  <img
+                    src={related.thumbnail}
+                    alt={related.title}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {related.durationSec > 0 ? (
+                    <span className="absolute bottom-1 right-1 px-1 rounded bg-black/80 text-white text-[9px]">
+                      {formatYouTubeDuration(related.durationSec)}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground line-clamp-2">
+                    {related.title}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {related.channel}
+                  </p>
+                  {related.views ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatViews(related.views)}
+                    </p>
+                  ) : null}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
