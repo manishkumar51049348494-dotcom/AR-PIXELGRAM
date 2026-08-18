@@ -3,41 +3,82 @@ import MobileLayout from '@/components/layouts/MobileLayout';
 import { searchProfiles } from '@/services/api';
 import type { Profile } from '@/types/types';
 import { Input } from '@/components/ui/input';
-import { Search, BadgeCheck, Loader2 } from 'lucide-react';
+import { Search, BadgeCheck, Loader2, Users, Music2, Video } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDebounce } from '@/hooks/useDebounce';
+import { cn } from '@/lib/utils';
+import YouTubeResults from '@/components/youtube/YouTubeResults';
+
+type SearchTab = 'people' | 'audio' | 'video';
+
+const TABS: { key: SearchTab; label: string; icon: React.ElementType }[] = [
+  { key: 'people', label: 'लोग', icon: Users },
+  { key: 'audio', label: 'गाने', icon: Music2 },
+  { key: 'video', label: 'वीडियो', icon: Video },
+];
 
 const SearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<SearchTab>('people');
   const [results, setResults] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
 
   useEffect(() => {
+    if (tab !== 'people') return;
     if (!debouncedQuery.trim()) { setResults([]); return; }
     setLoading(true);
     searchProfiles(debouncedQuery).then(profiles => {
       setResults(profiles);
       setLoading(false);
     });
-  }, [debouncedQuery]);
+  }, [debouncedQuery, tab]);
+
+  const placeholder =
+    tab === 'people' ? 'Search people…' : tab === 'audio' ? 'गाने का नाम खोजें…' : 'वीडियो खोजें…';
 
   return (
     <MobileLayout>
       <div className="p-4 page-transition">
-        <div className="relative mb-5">
+        <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search people…"
+            placeholder={placeholder}
             value={query}
             onChange={e => setQuery(e.target.value)}
             className="h-11 pl-9"
             autoFocus
           />
-          {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />}
+          {loading && tab === 'people' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />}
         </div>
 
-        {!query.trim() ? (
+        {/* लोग / गाने / वीडियो tabs — search box के नीचे */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const active = tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all border',
+                  active
+                    ? 'text-white border-transparent'
+                    : 'text-muted-foreground border-border/60 hover:bg-muted',
+                )}
+                style={active ? { background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' } : {}}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab !== 'people' ? (
+          <YouTubeResults query={debouncedQuery} kind={tab} />
+        ) : !query.trim() ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Search className="w-16 h-16 text-muted-foreground mb-3" />
             <p className="text-muted-foreground text-sm">Search for people by username or name</p>
