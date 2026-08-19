@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import MobileLayout from '@/components/layouts/MobileLayout';
+import PullToRefresh from '@/components/common/PullToRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/withTimeout';
 import {
@@ -56,7 +57,7 @@ const NotificationsPage: React.FC = () => {
   // Enable system/browser notifications for this user
   useBrowserNotifications(user?.id);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user) return;
     try {
       const notifs = await withTimeout(getNotifications(user.id), 20000);
@@ -64,9 +65,9 @@ const NotificationsPage: React.FC = () => {
       await markNotificationsRead(user.id);
     } catch (e) { console.error('notifications load failed', e); }
     finally { setLoading(false); }
-  };
+  }, [user]);
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [load]);
 
   // Realtime
   useEffect(() => {
@@ -162,6 +163,7 @@ const NotificationsPage: React.FC = () => {
 
   return (
     <MobileLayout>
+      <PullToRefresh onRefresh={load}>
       <div className="page-transition">
         <div className="px-4 py-4 border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
           <h2 className="text-xl font-bold text-foreground">Notifications</h2>
@@ -230,6 +232,7 @@ const NotificationsPage: React.FC = () => {
           </div>
         )}
       </div>
+      </PullToRefresh>
     </MobileLayout>
   );
 };
