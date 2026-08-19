@@ -11,6 +11,7 @@ import {
 } from '@/services/api';
 import type { Story, Profile, Post } from '@/types/types';
 import PostCard from '@/components/common/PostCard';
+import PullToRefresh from '@/components/common/PullToRefresh';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, X, ChevronLeft, ChevronRight, Trash2, ImagePlus, Film, Loader2, Share2, Heart, Eye, Send, Clock } from 'lucide-react';
@@ -98,6 +99,23 @@ const StoriesPage: React.FC = () => {
   };
 
   const handleDeletePost = (postId: string) => setPosts(prev => prev.filter(p => p.id !== postId));
+
+  // Instagram jaisa pull-to-refresh — stories + posts dono dobara load
+  const handleRefresh = async () => {
+    if (!user) return;
+    try {
+      const [s, p] = await Promise.all([
+        withTimeout(getFeedStories(user.id), 20000),
+        withTimeout(getAllPosts(0, POSTS_PAGE_SIZE, user.id), 20000),
+      ]);
+      setStories(s);
+      setPosts(p);
+      setPostsPage(0);
+      setHasMorePosts(p.length === POSTS_PAGE_SIZE);
+    } catch (e) {
+      console.error('refresh failed', e);
+    }
+  };
 
   // Record view when story is opened + load liked state
   useEffect(() => {
@@ -243,6 +261,7 @@ const StoriesPage: React.FC = () => {
 
   return (
     <MobileLayout>
+      <PullToRefresh onRefresh={handleRefresh} disabled={!!viewerUserId}>
       <div className="page-transition">
         {/* Stories row */}
         <div className="flex items-start gap-3 px-4 py-4 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
@@ -665,6 +684,7 @@ const StoriesPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </PullToRefresh>
       )}
     </MobileLayout>
   );
