@@ -335,6 +335,7 @@ const ReelsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [dragOffset, setDragOffset] = useState(0); // live drag in px
   const [isSnapping, setIsSnapping] = useState(false); // CSS transition on/off
@@ -427,6 +428,16 @@ const ReelsPage: React.FC = () => {
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (isAnimating.current) return;
     const dy = touchStartY.current - e.changedTouches[0].clientY;
+
+    // Instagram jaisa pull-to-refresh: pehle reel par neeche kheencho to feed refresh
+    if (activeIndex === 0 && dy < -90 && !refreshing) {
+      setIsSnapping(true);
+      setDragOffset(0);
+      setRefreshing(true);
+      loadReels().finally(() => setRefreshing(false));
+      return;
+    }
+
     const dt = Math.max(1, Date.now() - touchStartTime.current);
     const velocity = Math.abs(dy) / dt;
 
@@ -485,7 +496,7 @@ const ReelsPage: React.FC = () => {
 
   return (
     <div
-      className="h-[100dvh] overflow-hidden bg-black touch-none"
+      className="relative h-[100dvh] overflow-hidden bg-black touch-none"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -516,6 +527,11 @@ const ReelsPage: React.FC = () => {
           );
         })}
       </div>
+      {refreshing && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-black/60 rounded-full p-2">
+          <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        </div>
+      )}
       <BottomNav overlay />
     </div>
   );
