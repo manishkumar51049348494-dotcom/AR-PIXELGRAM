@@ -13,6 +13,7 @@ interface CommentsSheetProps {
   postOwnerId: string;
   open: boolean;
   onClose: () => void;
+  onCountChange?: (count: number) => void;
 }
 
 /**
@@ -21,7 +22,7 @@ interface CommentsSheetProps {
  * visualViewport se keyboard ki height nikaal kar sheet ko upar utha dete hain,
  * isliye "Add a comment…" hamesha keyboard ke thik uper dikhta hai.
  */
-const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open, onClose }) => {
+const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open, onClose, onCountChange }) => {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [content, setContent] = useState('');
@@ -32,7 +33,7 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
 
   useEffect(() => {
     if (open) {
-      getComments(postId).then(setComments);
+      getComments(postId).then(list => { setComments(list); onCountChange?.(list.length); });
       // Sheet khulte hi comment box par focus — user turant type kar sake.
       const t = setTimeout(() => inputRef.current?.focus(), 200);
       return () => clearTimeout(t);
@@ -78,6 +79,7 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
       }
       const updated = await getComments(postId);
       setComments(updated);
+      onCountChange?.(updated.length);
       // Keyboard khula rakho taki user lagataar comment kar sake.
       inputRef.current?.focus();
     } catch (err) {
@@ -103,7 +105,9 @@ const CommentsSheet: React.FC<CommentsSheetProps> = ({ postId, postOwnerId, open
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <h3 className="font-semibold text-foreground">Comments</h3>
+          <h3 className="font-semibold text-foreground">
+            {comments.length > 0 ? `${comments.length.toLocaleString()} ${comments.length === 1 ? 'comment' : 'comments'}` : 'Comments'}
+          </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
