@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Download, Share, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -16,6 +17,7 @@ let deferredPrompt: BeforeInstallPromptEvent | null = null;
  * App install ho chuki ho to button apne aap chhup jata hai.
  */
 const InstallAppButton: React.FC<{ className?: string; label?: string }> = ({ className, label = 'Install app' }) => {
+  const { user } = useAuth();
   const [canInstall, setCanInstall] = useState(!!deferredPrompt);
   const [iosHelp, setIosHelp] = useState(false);
 
@@ -50,6 +52,8 @@ const InstallAppButton: React.FC<{ className?: string; label?: string }> = ({ cl
     };
   }, []);
 
+  // Sirf logged-out (landing / account create) par hi APK download dikhana hai.
+  if (user) return null;
   if (isStandalone && !isAndroid) return null;
 
   const handleClick = async () => {

@@ -4,6 +4,7 @@ import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
 import { getProfile } from '@/services/api';
 import { usePushSubscription } from '@/hooks/usePushSubscription';
+import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 import { withTimeout } from '@/lib/withTimeout';
 
 interface AuthContextType {
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Register service worker + subscribe this device to Web Push so incoming
   // calls & messages can wake the phone even when the app is closed/locked.
   usePushSubscription(user?.id);
+  useNativeNotifications(user?.id);
 
   const refreshProfile = useCallback(async () => {
     try {

@@ -4,7 +4,6 @@ import { Home, Search, BookOpen, MessageCircle, User, Bell, Plus, Globe } from '
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import LanguageSelector from '@/components/common/LanguageSelector';
-import InstallAppButton from '@/components/common/InstallAppButton';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import { cn } from '@/lib/utils';
 import {
@@ -58,9 +57,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
         </Link>
 
         <div className="flex items-center gap-1">
-          {/* Install app (PWA) */}
-          <InstallAppButton label="Install" />
-
           {/* Language selector */}
           <LanguageSelector compact />
 

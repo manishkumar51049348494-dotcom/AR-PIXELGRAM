@@ -12,7 +12,7 @@ import ReelCommentsSheet from '@/components/common/ReelCommentsSheet';
 import BottomNav from '@/components/layouts/BottomNav';
 
 // Only render video for active ± 1 reels — prevents loading all videos at once
-const RENDER_WINDOW = 1;
+const RENDER_WINDOW = 2;
 
 const ReelCard: React.FC<{
   reel: Reel;
@@ -52,18 +52,19 @@ const ReelCard: React.FC<{
     const v = videoRef.current;
     if (!v) return;
     if (isActive) {
-      // Wait for enough data before playing to avoid stutter
-      const tryPlay = () => v.play().catch(() => {});
-      if (v.readyState >= 3) {
-        tryPlay();
-      } else {
-        v.addEventListener('canplay', tryPlay, { once: true });
-        return () => v.removeEventListener('canplay', tryPlay);
-      }
-    } else {
-      v.pause();
-      v.currentTime = 0;
+      // Instagram-jaisa instant play: pehle frame ka intezaar nahi karte,
+      // seedha play() call karte hain aur agar browser ne abhi data nahi
+      // liya to canplay par dobara try kar lete hain.
+      const tryPlay = () => { v.play().catch(() => {}); };
+      tryPlay();
+      v.addEventListener('canplay', tryPlay, { once: true });
+      v.addEventListener('loadeddata', tryPlay, { once: true });
+      return () => {
+        v.removeEventListener('canplay', tryPlay);
+        v.removeEventListener('loadeddata', tryPlay);
+      };
     }
+    v.pause();
   }, [isActive]);
 
   // Reel ka gana — video ke saath play/pause aur chosen start point se loop
@@ -150,8 +151,11 @@ const ReelCard: React.FC<{
           className="absolute inset-0 w-full h-full object-cover"
           loop
           playsInline
-          muted={muted || muteOriginal}
-          preload={isActive ? 'auto' : 'none'}
+          poster={reel.thumbnail_url || undefined}
+          // Aas-paas ke reels pehle se buffer ho jate hain, isliye scroll
+          // karte hi video turant chalti hai — koi 1 second ka kaala frame nahi.
+          preload="auto"
+          style={{ backgroundColor: '#000' }}
           onClick={() => {
             const v = videoRef.current;
             if (!v) return;
@@ -166,8 +170,12 @@ const ReelCard: React.FC<{
           }}
         />
       ) : (
-        // Placeholder for far-away reels — no network load
-        <div className="absolute inset-0 bg-black" />
+        // Placeholder for far-away reels — thumbnail dikhate hain taki
+        // scroll karte waqt kaala/khali frame na dikhe.
+        <div
+          className="absolute inset-0 bg-black bg-cover bg-center"
+          style={reel.thumbnail_url ? { backgroundImage: `url(${reel.thumbnail_url})` } : undefined}
+        />
       )}
 
       {/* Reel ka gana */}
