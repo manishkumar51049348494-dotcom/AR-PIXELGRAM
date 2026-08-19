@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import MobileLayout from '@/components/layouts/MobileLayout';
+import PullToRefresh from '@/components/common/PullToRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/withTimeout';
 import { getMutualFollows, getMessages, getUnreadCount, getMessagedProfiles } from '@/services/api';
@@ -18,9 +19,9 @@ const ChatListPage: React.FC = () => {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!user) return;
-    const load = async () => {
+    {
       try {
         const [mutuals, messaged] = await withTimeout(Promise.all([
           getMutualFollows(user.id),
@@ -48,12 +49,14 @@ const ChatListPage: React.FC = () => {
         }));
       } catch { /* ignore */ }
       finally { setLoading(false); }
-    };
-    load();
+    }
   }, [user]);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <MobileLayout>
+      <PullToRefresh onRefresh={load}>
       <div className="page-transition">
         <div className="px-4 py-4 border-b border-border">
           <h2 className="text-xl font-bold text-foreground">Messages</h2>
@@ -115,6 +118,7 @@ const ChatListPage: React.FC = () => {
           </div>
         )}
       </div>
+      </PullToRefresh>
     </MobileLayout>
   );
 };
