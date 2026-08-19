@@ -20,6 +20,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete }) => {
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [saved, setSaved] = useState(post.is_saved || false);
   const [showComments, setShowComments] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
   const [showMenu, setShowMenu] = useState(false);
 
   const isOwner = user?.id === post.user_id;
@@ -130,8 +131,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete }) => {
           >
             <Heart className={cn('w-6 h-6', liked && 'fill-current')} />
           </button>
-          <button onClick={() => setShowComments(true)} className="p-1 text-foreground hover:text-primary transition-colors">
+          <button onClick={() => setShowComments(true)} className="p-1 flex items-center gap-1 text-foreground hover:text-primary transition-colors">
             <MessageCircle className="w-6 h-6" />
+            {commentsCount > 0 && <span className="text-sm font-semibold">{commentsCount.toLocaleString()}</span>}
           </button>
           <button onClick={handleShare} className="p-1 text-foreground hover:text-primary transition-colors">
             <Share2 className="w-6 h-6" />
@@ -161,7 +163,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete }) => {
           onClick={() => setShowComments(true)}
           className="text-xs text-muted-foreground mt-1 hover:text-foreground transition-colors"
         >
-          View comments
+          {commentsCount > 0
+            ? commentsCount === 1 ? 'View 1 comment' : `View all ${commentsCount.toLocaleString()} comments`
+            : 'Add a comment'}
         </button>
       </div>
 
@@ -172,6 +176,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete }) => {
           postOwnerId={post.user_id}
           open={showComments}
           onClose={() => setShowComments(false)}
+          onCountChange={setCommentsCount}
         />
       )}
     </article>
