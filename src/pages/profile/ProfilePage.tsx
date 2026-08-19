@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layouts/MobileLayout';
+import PullToRefresh from '@/components/common/PullToRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
@@ -251,6 +252,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <MobileLayout>
+      <PullToRefresh onRefresh={load}>
       <div className="page-transition">
         {/* Suspended/Locked banner for other users' profiles */}
         {isSuspended && (
@@ -522,6 +524,7 @@ const ProfilePage: React.FC = () => {
           </>
         )}
       </div>
+      </PullToRefresh>
     </MobileLayout>
   );
 };
