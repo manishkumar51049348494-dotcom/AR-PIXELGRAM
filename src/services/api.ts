@@ -506,7 +506,16 @@ export async function getUnreadNotificationsCount(userId: string): Promise<numbe
 
 // ===================== VERIFICATION =====================
 export async function submitVerificationRequest(reason: string): Promise<void> {
-  await supabase.from('verification_requests').upsert({ reason, status: 'pending' }, { onConflict: 'user_id' });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  // Rejected request ke baad dobara request karne par purani row hi pending ho jaati hai.
+  const { error } = await supabase
+    .from('verification_requests')
+    .upsert(
+      { user_id: user.id, reason, status: 'pending', reviewed_at: null },
+      { onConflict: 'user_id' },
+    );
+  if (error) throw error;
 }
 
 export async function getMyVerificationRequest(userId: string): Promise<VerificationRequest | null> {

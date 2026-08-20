@@ -45,13 +45,18 @@ const SettingsPage: React.FC = () => {
   const handleSubmitVerification = async () => {
     if (!verifyReason.trim()) { toast.error('Please explain why you should be verified'); return; }
     setLoading(true);
-    await submitVerificationRequest(verifyReason.trim());
-    const updated = await getMyVerificationRequest(user!.id);
-    setVerificationRequest(updated);
-    toast.success('Verification request submitted!');
-    setVerifyReason('');
-    setLoading(false);
-    setSection('main');
+    try {
+      await submitVerificationRequest(verifyReason.trim());
+      const updated = await getMyVerificationRequest(user!.id);
+      setVerificationRequest(updated);
+      toast.success('Verification request submitted!');
+      setVerifyReason('');
+      setSection('main');
+    } catch (err) {
+      toast.error((err as Error).message || 'Request submit nahi ho paayi');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmitReport = async () => {
@@ -151,7 +156,7 @@ const SettingsPage: React.FC = () => {
               <h3 className="font-bold text-foreground text-lg">Already Verified!</h3>
               <p className="text-sm text-muted-foreground">Your account has a verified badge.</p>
             </div>
-          ) : verificationRequest ? (
+          ) : verificationRequest && verificationRequest.status !== 'rejected' ? (
             <div className="glass-card rounded-xl p-5 text-center">
               <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium mb-3
                 ${verificationRequest.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
@@ -161,13 +166,23 @@ const SettingsPage: React.FC = () => {
                 {verificationRequest.status.charAt(0).toUpperCase() + verificationRequest.status.slice(1)}
               </div>
               <p className="text-sm text-muted-foreground text-pretty">
-                {verificationRequest.status === 'pending' ? 'Your request is under review. We\'ll notify you soon.' :
-                 verificationRequest.status === 'rejected' ? 'Your request was not approved. You may submit a new request.' :
-                 'Congratulations! Your account is verified.'}
+                {verificationRequest.status === 'pending'
+                  ? 'Your request is under review. We\'ll notify you soon.'
+                  : 'Congratulations! Your account is verified.'}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
+              {verificationRequest?.status === 'rejected' && (
+                <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 p-4 text-center space-y-1">
+                  <div className="inline-flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
+                    <BadgeCheck className="w-4 h-4" /> Rejected
+                  </div>
+                  <p className="text-sm text-muted-foreground text-pretty">
+                    Your last request was not approved. You can submit a new request below.
+                  </p>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>Why should your account be verified?</Label>
                 <Textarea
