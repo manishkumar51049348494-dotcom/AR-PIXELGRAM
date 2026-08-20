@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
+  server: {
+    androidScheme: 'https',
+    cleartext: true,
+    allowNavigation: ['*'],
+  },
 };
 
 export default config;

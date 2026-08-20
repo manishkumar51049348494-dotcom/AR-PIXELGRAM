@@ -684,8 +684,8 @@ const StoriesPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </PullToRefresh>
       )}
+      </PullToRefresh>
     </MobileLayout>
   );
 };
