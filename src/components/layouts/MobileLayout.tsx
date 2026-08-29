@@ -1,14 +1,11 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Video, BookOpen, MessageCircle, User, Bell, Plus, Globe } from 'lucide-react';
+import { Home, Video, BookOpen, MessageCircle, User, Bell, Plus, Globe, ImagePlus, Clapperboard, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import LanguageSelector from '@/components/common/LanguageSelector';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import { cn } from '@/lib/utils';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 
 interface MobileLayoutProps {
   children: React.ReactNode;
@@ -22,6 +19,22 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
   const { profile, user } = useAuth();
   const { t } = useLanguage();
   const unreadNotifications = useUnreadNotifications(user?.id);
+  const [createOpen, setCreateOpen] = React.useState(false);
+
+  const createOptions = [
+    {
+      path: '/create',
+      icon: ImagePlus,
+      title: t('newPost'),
+      desc: 'Photo ya video post share karein',
+    },
+    {
+      path: '/create-reel',
+      icon: Clapperboard,
+      title: t('newReel'),
+      desc: 'Music aur cover ke saath reel banayein',
+    },
+  ];
 
   // fullscreen mode — reels की तरह pure black, no header, no nav
   if (fullscreen) {
@@ -60,23 +73,14 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
           {/* Language selector */}
           <LanguageSelector compact />
 
-          {/* Create button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="w-9 h-9 rounded-full flex items-center justify-center text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95"
-                style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}>
-                <Plus className="w-4 h-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => navigate('/create')} className="gap-2">
-                <span>📷</span> {t('newPost')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/create-reel')} className="gap-2">
-                <span>🎬</span> {t('newReel')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Create button — Instagram-style bottom sheet */}
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
 
           {/* Notifications */}
           <Link to="/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
@@ -126,6 +130,46 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
             })}
           </div>
         </nav>
+      )}
+
+      {/* Premium create sheet (Instagram jaisa) */}
+      {createOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setCreateOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-lg rounded-t-3xl bg-background border-t border-border/50 px-5 pt-3 pb-8 safe-bottom shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-bold text-foreground">Create</h2>
+              <button onClick={() => setCreateOpen(false)} className="p-1.5 rounded-full hover:bg-muted/60">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {createOptions.map(({ path, icon: Icon, title, desc }) => (
+                <button
+                  key={path}
+                  onClick={() => { setCreateOpen(false); navigate(path); }}
+                  className="w-full flex items-center gap-4 rounded-2xl border border-border/40 bg-card px-4 py-3.5 text-left transition-all active:scale-[0.98] hover:border-primary/40"
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center text-primary-foreground shrink-0"
+                    style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-foreground">{title}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
+                  <Plus className="w-4 h-4 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
