@@ -149,41 +149,89 @@ const CreateReelPage: React.FC = () => {
   if (step === 'pick') {
     return (
       <div className="fixed inset-0 bg-black flex flex-col">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full active:bg-white/10">
+        {/* Camera-style top bar (Instagram jaisa) */}
+        <div className="flex items-center gap-2 px-3 pt-3">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center active:scale-95">
             <X className="w-6 h-6 text-white" />
           </button>
-          <h1 className="flex-1 text-center text-base font-bold text-white pr-8">New reel</h1>
+          <div className="flex-1" />
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="h-9 px-4 rounded-full bg-white/12 backdrop-blur flex items-center gap-1.5 active:scale-95"
+          >
+            <Music2 className="w-4 h-4 text-white" />
+            <span className="text-xs font-bold text-white">{track ? 'Music added' : 'Add music'}</span>
+          </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-5">
-          <div className="w-24 h-24 rounded-3xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}>
-            <Film className="w-11 h-11 text-white" />
+        {/* Viewfinder */}
+        <button
+          onClick={() => videoInputRef.current?.click()}
+          className="relative flex-1 mx-3 my-3 rounded-3xl overflow-hidden active:scale-[0.99] transition-transform"
+          style={{ background: 'radial-gradient(120% 90% at 50% 0%, hsl(var(--p1)/0.45), transparent 60%), #0b0b0d' }}
+        >
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
+            <div
+              className="w-20 h-20 rounded-[26px] flex items-center justify-center shadow-2xl"
+              style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+            >
+              <Film className="w-9 h-9 text-white" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-bold text-white">Gallery se video chunein</p>
+              <p className="text-xs text-white/55">MP4 · MOV · Max 100MB · 9:16 best</p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-lg font-bold text-white">Reel banayein</p>
-            <p className="text-sm text-white/60">Gallery se video chunein · MP4, MOV · Max 100MB</p>
-          </div>
-        </div>
 
-        <div className="px-6 pb-10 space-y-3">
+          {/* Selected song chip */}
+          {track && (
+            <div className="absolute left-4 bottom-4 right-4 flex items-center gap-2 rounded-full bg-black/55 backdrop-blur px-3 py-2">
+              {track.artwork
+                ? <img src={track.artwork} alt="" className="w-6 h-6 rounded-full object-cover" />
+                : <Music2 className="w-4 h-4 text-white" />}
+              <span className="flex-1 text-xs text-white font-medium truncate text-left">{track.title} · {track.artist}</span>
+            </div>
+          )}
+        </button>
+
+        {/* Shutter row */}
+        <div className="flex items-center justify-center gap-10 pb-4">
+          <button onClick={() => videoInputRef.current?.click()} className="w-11 h-11 rounded-xl overflow-hidden bg-white/12 flex items-center justify-center active:scale-95">
+            <ImageIcon className="w-5 h-5 text-white" />
+          </button>
           <button
             onClick={() => videoInputRef.current?.click()}
-            className="w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            className="w-[74px] h-[74px] rounded-full p-[3px] active:scale-95 transition-transform"
             style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
           >
-            <ImageIcon className="w-5 h-5" /> Gallery se select karein
+            <span className="block w-full h-full rounded-full border-[5px] border-black bg-white/95" />
           </button>
-          <p className="text-center text-[11px] text-white/40">
-            Video select karne ke baad music, cover aur caption add kar sakte hain.
-          </p>
+          <button onClick={() => setPickerOpen(true)} className="w-11 h-11 rounded-xl bg-white/12 flex items-center justify-center active:scale-95">
+            <Music2 className="w-5 h-5 text-white" />
+          </button>
+        </div>
+
+        {/* Mode strip */}
+        <div className="flex items-center justify-center gap-7 pb-8 text-[12px] font-bold tracking-wide">
+          <button onClick={() => navigate('/create')} className="text-white/45">POST</button>
+          <span className="text-white relative">
+            REEL
+            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-white" />
+          </span>
+          <button onClick={() => setPickerOpen(true)} className="text-white/45">MUSIC</button>
         </div>
 
         <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+
+        <MusicPickerSheet
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(selected) => { setPickerOpen(false); setTrack(selected); setStartMs(0); toast.success('Music add ho gaya 🎵'); }}
+        />
       </div>
     );
   }
+
 
   /* ---------------------------- STEP 2 — EDIT ---------------------------- */
   if (step === 'edit') {
