@@ -3,7 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import MobileLayout from '@/components/layouts/MobileLayout';
 import { getReelsByMusic, type Reel } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Loader2, Music2, Play, Pause } from 'lucide-react';
+import { ArrowLeft, Loader2, Music2, Play, Pause, Bookmark, Eye, Film } from 'lucide-react';
+import { getSavedSongs, saveSong, unsaveSong } from '@/services/savedSongs';
+import type { MusicTrack } from '@/services/music';
+import { toast } from 'sonner';
 
 /** Instagram jaisa "song page" — gaane ka cover, kitne reels bane, original owner. */
 const SongPage: React.FC = () => {
@@ -12,6 +15,7 @@ const SongPage: React.FC = () => {
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const [saved, setSaved] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -29,6 +33,38 @@ const SongPage: React.FC = () => {
   const artwork = first?.music_artwork_url || undefined;
   const preview = first?.music_preview_url || undefined;
   const owner = first?.profile;
+  const totalViews = reels.reduce((sum, r) => sum + (r.views_count || 0), 0);
+
+  const asTrack = (): MusicTrack | null => {
+    if (!trackId || !preview) return null;
+    return { id: trackId, title, artist, artwork: artwork || '', previewUrl: preview, durationMs: 30000 };
+  };
+
+  // Saved songs list se pata karo ki ye gana pehle se save hai ya nahi
+  useEffect(() => {
+    if (!trackId) return;
+    getSavedSongs().then(list => setSaved(list.some(t => t.id === trackId))).catch(() => {});
+  }, [trackId]);
+
+  const toggleSave = async () => {
+    const track = asTrack();
+    if (!track) return;
+    if (saved) {
+      setSaved(false);
+      await unsaveSong(track.id).catch(() => {});
+      toast.success('Song saved list se hata diya');
+    } else {
+      setSaved(true);
+      await saveSong(track).catch(() => {});
+      toast.success('Song save ho gaya 🎵');
+    }
+  };
+
+  const useAudio = () => {
+    const track = asTrack();
+    if (!track) { toast.error('Is audio ka preview available nahi'); return; }
+    navigate('/create-reel', { state: { track } });
+  };
 
   const togglePlay = () => {
     const a = audioRef.current;
@@ -74,10 +110,29 @@ const SongPage: React.FC = () => {
               <div className="min-w-0">
                 <h2 className="font-bold text-foreground text-lg truncate">{title}</h2>
                 <p className="text-sm text-muted-foreground truncate">{artist}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {reels.length} {reels.length === 1 ? 'reel' : 'reels'} इस गाने पर
-                </p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Film className="w-3.5 h-3.5" />{reels.length} {reels.length === 1 ? 'reel' : 'reels'}</span>
+                  <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{totalViews > 999 ? `${(totalViews / 1000).toFixed(1)}k` : totalViews} views</span>
+                </div>
               </div>
+            </div>
+
+            {/* Use audio + Save — Instagram jaisa */}
+            <div className="flex items-center gap-2 px-4 pb-4">
+              <button
+                onClick={useAudio}
+                className="flex-1 h-11 rounded-xl font-bold text-white text-sm active:scale-[0.98] transition-transform"
+                style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
+              >
+                Use audio
+              </button>
+              <button
+                onClick={toggleSave}
+                aria-label="Save song"
+                className={`w-11 h-11 rounded-xl flex items-center justify-center border border-border/60 active:scale-95 ${saved ? 'bg-primary/15 text-primary' : 'bg-muted/50 text-foreground'}`}
+              >
+                <Bookmark className={`w-5 h-5 ${saved ? 'fill-current' : ''}`} />
+              </button>
             </div>
 
             {preview && <audio ref={audioRef} src={preview} onEnded={() => setPlaying(false)} />}

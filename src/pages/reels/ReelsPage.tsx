@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, MoreVertical, Trash2, Plus, BadgeCheck } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Plus, BadgeCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getReelsFeed, getReelById, recordReelView, toggleReelLike, deleteReel, createNotification, getReelCommentsCount, type Reel } from '@/services/api';
@@ -26,7 +26,6 @@ const ReelCard: React.FC<{
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [muted, setMuted] = useState(false);
   const hasMusic = !!reel.music_preview_url;
   const musicStart = (reel.music_start_ms || 0) / 1000;
   const muteOriginal = hasMusic && !!reel.mute_original;
@@ -79,12 +78,6 @@ const ReelCard: React.FC<{
       a.currentTime = musicStart;
     }
   }, [isActive, hasMusic, musicStart]);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.muted = muted;
-  }, [muted]);
 
   // Count a view once this reel has actually been watched for a moment
   // (avoids counting a quick scroll-past as a "view").
@@ -149,6 +142,7 @@ const ReelCard: React.FC<{
           ref={videoRef}
           src={reel.video_url}
           className="absolute inset-0 w-full h-full object-cover"
+          muted={muteOriginal}
           loop
           playsInline
           poster={reel.thumbnail_url || undefined}
@@ -265,10 +259,6 @@ const ReelCard: React.FC<{
           <span className="text-white text-xs font-semibold">{t('share')}</span>
         </button>
 
-        {/* Mute */}
-        <button onClick={() => setMuted(!muted)} className="w-11 h-11 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
-          {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
-        </button>
       </div>
 
       {/* Bottom info */}

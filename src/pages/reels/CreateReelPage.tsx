@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Film, X, Loader2, ArrowLeft, Music2, VolumeX, Volume2, Pencil, ImageIcon,
   Play, Pause, Check, ChevronRight, Sparkles,
@@ -25,7 +25,9 @@ type Step = 'pick' | 'edit' | 'share';
 const CreateReelPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -50,6 +52,13 @@ const CreateReelPage: React.FC = () => {
   const [muteOriginal, setMuteOriginal] = useState(true);
 
   useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
+
+  // Song page se "Use audio" — gana pehle se laga hua aata hai
+  useEffect(() => {
+    const passed = (location.state as { track?: MusicTrack } | null)?.track;
+    if (passed?.previewUrl) { setTrack(passed); setStartMs(0); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -179,7 +188,7 @@ const CreateReelPage: React.FC = () => {
             </div>
             <div className="space-y-1">
               <p className="text-lg font-bold text-white">Gallery se video chunein</p>
-              <p className="text-xs text-white/55">MP4 · MOV · Max 100MB · 9:16 best</p>
+              <p className="text-xs text-white/55">Ya neeche shutter dabakar camera se record karein</p>
             </div>
           </div>
 
@@ -200,7 +209,7 @@ const CreateReelPage: React.FC = () => {
             <ImageIcon className="w-5 h-5 text-white" />
           </button>
           <button
-            onClick={() => videoInputRef.current?.click()}
+            onClick={() => cameraInputRef.current?.click()}
             className="w-[74px] h-[74px] rounded-full p-[3px] active:scale-95 transition-transform"
             style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
           >
@@ -222,6 +231,8 @@ const CreateReelPage: React.FC = () => {
         </div>
 
         <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+        {/* Phone ke camera se seedha reel record karne ke liye */}
+        <input ref={cameraInputRef} type="file" accept="video/*" capture="environment" className="hidden" onChange={handleVideoChange} />
 
         <MusicPickerSheet
           open={pickerOpen}
