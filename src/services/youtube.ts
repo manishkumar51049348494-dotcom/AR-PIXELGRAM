@@ -64,7 +64,7 @@ const INVIDIOUS = [
 async function getJson<T>(
   url: string,
   signal?: AbortSignal,
-  ms = 12000,
+  ms = 6000,
 ): Promise<T | null> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), ms);
@@ -120,7 +120,7 @@ function mapPiped(items: PipedItem[] = []): YouTubeItem[] {
       id,
       title: it.title,
       channel: it.uploaderName || "YouTube",
-      thumbnail: it.thumbnail || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
       durationSec:
         typeof it.duration === "number" && it.duration > 0 ? it.duration : 0,
       views:
@@ -155,7 +155,7 @@ function mapInv(items: InvItem[] = []): YouTubeItem[] {
       id,
       title: it.title,
       channel: it.author || "YouTube",
-      thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
       durationSec: it.lengthSeconds || 0,
       views: it.viewCount || undefined,
       uploaded: it.publishedText,
@@ -166,6 +166,49 @@ function mapInv(items: InvItem[] = []): YouTubeItem[] {
 
 /* --------------------------------- Search --------------------------------- */
 
+/** Jo instance sabse pehle result de, wahi jeete — sequential wait nahi. */
+async function firstResult(
+  tasks: Array<() => Promise<YouTubeItem[]>>,
+): Promise<YouTubeItem[]> {
+  return new Promise((resolve) => {
+    let pending = tasks.length;
+    let done = false;
+    if (!pending) return resolve([]);
+    for (const task of tasks) {
+      task()
+        .then((items) => {
+          if (!done && items.length) {
+            done = true;
+            resolve(items);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          pending -= 1;
+          if (pending === 0 && !done) {
+            done = true;
+            resolve([]);
+          }
+        });
+    }
+  });
+}
+
+/** Chhota in-memory cache — wahi search dobara turant khulti hai. */
+const cache = new Map<string, { at: number; items: YouTubeItem[] }>();
+const CACHE_MS = 5 * 60 * 1000;
+
+function fromCache(key: string): YouTubeItem[] | null {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.items;
+  if (hit) cache.delete(key);
+  return null;
+}
+
+function toCache(key: string, items: YouTubeItem[]) {
+  if (items.length) cache.set(key, { at: Date.now(), items });
+}
+
 export async function searchYouTube(
   query: string,
   kind: YouTubeKind,
@@ -174,31 +217,34 @@ export async function searchYouTube(
   const q = query.trim();
   if (!q) return [];
   const term = kind === "audio" ? `${q} song` : q;
+  const key = `s:${kind}:${term.toLowerCase()}`;
+  const cached = fromCache(key);
+  if (cached) return cached;
 
-  for (const base of PIPED) {
-    const json = await getJson<{ items?: PipedItem[] }>(
-      `${base}/search?q=${encodeURIComponent(term)}&filter=${kind === "audio" ? "music_songs" : "videos"}`,
-      signal,
-    );
-    const mapped = mapPiped(json?.items);
-    if (mapped.length) return mapped;
-    if (signal?.aborted) return [];
-  }
+  const tasks = [
+    ...PIPED.map((base) => async () => {
+      const json = await getJson<{ items?: PipedItem[] }>(
+        `${base}/search?q=${encodeURIComponent(term)}&filter=${kind === "audio" ? "music_songs" : "videos"}`,
+        signal,
+      );
+      return mapPiped(json?.items);
+    }),
+    ...INVIDIOUS.map((base) => async () => {
+      const json = await getJson<InvItem[]>(
+        `${base}/api/v1/search?q=${encodeURIComponent(term)}&type=video`,
+        signal,
+      );
+      return mapInv(json || []);
+    }),
+  ];
 
-  for (const base of INVIDIOUS) {
-    const json = await getJson<InvItem[]>(
-      `${base}/api/v1/search?q=${encodeURIComponent(term)}&type=video`,
-      signal,
-    );
-    const mapped = mapInv(json || []);
-    if (mapped.length) return mapped;
-    if (signal?.aborted) return [];
-  }
-  return [];
+  const items = await firstResult(tasks);
+  toCache(key, items);
+  return items;
 }
 
 /* -------------------------------- Trending -------------------------------- */
-// Search से पहले page खाली न रहे — India के trending गाने / वीडियो दिखते हैं.
+// Search se pehle page khali na rahe — India ke trending gaane / video.
 
 const TRENDING_SEEDS = [
   "new hindi songs 2026",
@@ -211,28 +257,31 @@ export async function getTrending(
   kind: YouTubeKind,
   signal?: AbortSignal,
 ): Promise<YouTubeItem[]> {
-  for (const base of PIPED) {
-    const json = await getJson<PipedItem[]>(
-      `${base}/trending?region=IN`,
-      signal,
-    );
-    const mapped = mapPiped(json || []);
-    if (mapped.length) return mapped;
-    if (signal?.aborted) return [];
+  const key = `t:${kind}`;
+  const cached = fromCache(key);
+  if (cached) return cached;
+
+  const tasks = [
+    ...PIPED.map((base) => async () => {
+      const json = await getJson<PipedItem[]>(`${base}/trending?region=IN`, signal);
+      return mapPiped(json || []);
+    }),
+    ...INVIDIOUS.map((base) => async () => {
+      const json = await getJson<InvItem[]>(
+        `${base}/api/v1/trending?region=IN${kind === "audio" ? "&type=music" : ""}`,
+        signal,
+      );
+      return mapInv(json || []);
+    }),
+  ];
+
+  let items = await firstResult(tasks);
+  if (!items.length) {
+    const seed = TRENDING_SEEDS[Math.floor(Math.random() * TRENDING_SEEDS.length)];
+    items = await searchYouTube(seed, kind, signal);
   }
-  for (const base of INVIDIOUS) {
-    const json = await getJson<InvItem[]>(
-      `${base}/api/v1/trending?region=IN${kind === "audio" ? "&type=music" : ""}`,
-      signal,
-    );
-    const mapped = mapInv(json || []);
-    if (mapped.length) return mapped;
-    if (signal?.aborted) return [];
-  }
-  // आख़िरी fallback — एक popular search से feed बना दो
-  const seed =
-    TRENDING_SEEDS[Math.floor(Math.random() * TRENDING_SEEDS.length)];
-  return searchYouTube(seed, kind, signal);
+  toCache(key, items);
+  return items;
 }
 
 /* ----------------------------- Video details ------------------------------ */

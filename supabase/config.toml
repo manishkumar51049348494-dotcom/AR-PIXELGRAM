@@ -3,3 +3,27 @@ enable_confirmations = false
 
 [auth.phone]
 enable_confirmations = false
+
+# Ye functions logged-out users (forgot password / account finder) call karte
+# hain, isliye JWT verification off — warna browser me
+# "Failed to send a request to the Edge Function" aata hai.
+[functions.find-accounts]
+verify_jwt = false
+
+[functions.password-reset-start]
+verify_jwt = false
+
+[functions.password-reset-confirm]
+verify_jwt = false
+
+[functions.login-with-identifier]
+verify_jwt = false
+
+[functions.resolve-account-email]
+verify_jwt = false
+
+[functions.account-identifier-start]
+verify_jwt = false
+
+[functions.account-identifier-confirm]
+verify_jwt = false

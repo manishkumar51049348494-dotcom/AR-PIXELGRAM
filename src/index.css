@@ -117,19 +117,21 @@
 @layer components {
   /* ── Glass card ── */
   .glass-card {
-    background: hsl(var(--card) / 0.82);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid hsl(var(--border) / 0.55);
-    box-shadow: var(--shadow-card);
+    /* Transparent glass — page content stays visible behind header/nav */
+    background: transparent;
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid hsl(var(--border) / 0.25);
+    box-shadow: none;
   }
 
   /* ── Bottom nav ── */
   .bottom-nav {
-    background: hsl(var(--card) / 0.92);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border-top: 1px solid hsl(var(--border) / 0.6);
+    /* No solid white plate — content scrolls visibly underneath */
+    background: transparent;
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border-top: 1px solid hsl(var(--border) / 0.25);
   }
 
   /* ── Story ring — animated gradient ── */
@@ -203,6 +205,8 @@
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-hover { box-shadow: var(--shadow-hover); }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom, 8px); }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { width: 0; height: 0; display: none; }
 }
 
 /* ── Keyframes ── */

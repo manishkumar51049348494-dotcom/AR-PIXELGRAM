@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, MoreVertical, Trash2, Plus } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, MoreVertical, Trash2, Plus, BadgeCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getReelsFeed, getReelById, recordReelView, toggleReelLike, deleteReel, createNotification, getReelCommentsCount, type Reel } from '@/services/api';
@@ -282,7 +282,7 @@ const ReelCard: React.FC<{
             </AvatarFallback>
           </Avatar>
           <span className="text-white font-bold text-sm">@{profile?.username}</span>
-          {profile?.is_verified && <span className="text-primary text-xs">✓</span>}
+          {profile?.is_verified && <BadgeCheck className="w-4 h-4 text-primary shrink-0" />}
         </button>
         {reel.caption && (
           <p className="text-white/90 text-sm line-clamp-2 leading-relaxed">{reel.caption}</p>
@@ -335,15 +335,10 @@ const ReelsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [dragOffset, setDragOffset] = useState(0); // live drag in px
-  const [isSnapping, setIsSnapping] = useState(false); // CSS transition on/off
   const [openCommentsFor, setOpenCommentsFor] = useState<string | null>(null);
 
-  const touchStartY = useRef(0);
-  const touchStartTime = useRef(0);
-  const isAnimating = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const reelsCountRef = useRef(0);
 
   const loadReels = useCallback(async () => {
@@ -367,8 +362,12 @@ const ReelsPage: React.FC = () => {
         if (idx >= 0) {
           setActiveIndex(idx);
           if (wantsComments) setOpenCommentsFor(targetId);
+          // jump to that reel once it is painted
+          requestAnimationFrame(() => {
+            const el = containerRef.current;
+            if (el) el.scrollTo({ top: idx * el.clientHeight });
+          });
         }
-        // Clear the query params so it doesn't re-trigger on refresh/back-nav
         setSearchParams({}, { replace: true });
       }
     } catch {
@@ -381,81 +380,26 @@ const ReelsPage: React.FC = () => {
 
   useEffect(() => { loadReels(); }, [loadReels]);
 
+  // Instagram jaisa: native scroll-snap — ek scroll par poori agli reel,
+  // beech me kabhi atakti nahi. Active reel scroll position se nikalte hain.
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollTop / el.clientHeight);
+    setActiveIndex(prev => (prev === idx ? prev : Math.max(0, Math.min(reelsCountRef.current - 1, idx))));
+  }, []);
+
   // Keyboard support for desktop
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (isAnimating.current) return;
-      if (e.key === 'ArrowDown') snapTo(1);
-      if (e.key === 'ArrowUp') snapTo(-1);
+      const el = containerRef.current;
+      if (!el) return;
+      if (e.key === 'ArrowDown') el.scrollBy({ top: el.clientHeight, behavior: 'smooth' });
+      if (e.key === 'ArrowUp') el.scrollBy({ top: -el.clientHeight, behavior: 'smooth' });
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const snapTo = (direction: number) => {
-    if (isAnimating.current) return;
-    isAnimating.current = true;
-    setIsSnapping(true);
-    setDragOffset(0);
-    setActiveIndex(prev => {
-      const next = Math.max(0, Math.min(reelsCountRef.current - 1, prev + direction));
-      return next;
-    });
-    setTimeout(() => { isAnimating.current = false; }, 350);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isAnimating.current) return;
-    touchStartY.current = e.touches[0].clientY;
-    touchStartTime.current = Date.now();
-    setIsSnapping(false); // disable transition while dragging
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (isAnimating.current) return;
-    const dy = e.touches[0].clientY - touchStartY.current;
-    // Resist at boundaries
-    setActiveIndex(prev => {
-      const atTop = prev === 0 && dy > 0;
-      const atBottom = prev === reelsCountRef.current - 1 && dy < 0;
-      const resistance = (atTop || atBottom) ? 0.15 : 1;
-      setDragOffset(dy * resistance);
-      return prev;
-    });
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (isAnimating.current) return;
-    const dy = touchStartY.current - e.changedTouches[0].clientY;
-
-    // Instagram jaisa pull-to-refresh: pehle reel par neeche kheencho to feed refresh
-    if (activeIndex === 0 && dy < -90 && !refreshing) {
-      setIsSnapping(true);
-      setDragOffset(0);
-      setRefreshing(true);
-      loadReels().finally(() => setRefreshing(false));
-      return;
-    }
-
-    const dt = Math.max(1, Date.now() - touchStartTime.current);
-    const velocity = Math.abs(dy) / dt;
-
-    // Threshold: 60px drag OR fast flick ≥ 0.25px/ms
-    const triggered = Math.abs(dy) > 60 || velocity >= 0.25;
-
-    setIsSnapping(true);
-    if (triggered && dy > 0) {
-      snapTo(1);  // next
-    } else if (triggered && dy < 0) {
-      snapTo(-1); // prev
-    } else {
-      // Snap back to current
-      isAnimating.current = true;
-      setDragOffset(0);
-      setTimeout(() => { isAnimating.current = false; }, 300);
-    }
-  };
 
   const handleDelete = (id: string) => {
     setReels(prev => {
@@ -495,27 +439,22 @@ const ReelsPage: React.FC = () => {
   }
 
   return (
-    <div
-      className="relative h-[100dvh] overflow-hidden bg-black touch-none"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Slide rail — follows finger live, then snaps */}
+    <div className="relative h-[100dvh] bg-black">
       <div
-        className="flex flex-col"
-        style={{
-          height: `${reels.length * 100}dvh`,
-          transform: `translateY(calc(-${activeIndex * 100}dvh + ${dragOffset}px))`,
-          transition: isSnapping ? 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
-          willChange: 'transform',
-        }}
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-y-contain"
+        style={{ scrollSnapType: 'y mandatory', WebkitOverflowScrolling: 'touch' }}
       >
         {reels.map((reel, idx) => {
           const isActive = idx === activeIndex;
           const isNear = Math.abs(idx - activeIndex) <= RENDER_WINDOW;
           return (
-            <div key={reel.id} style={{ height: '100dvh', flexShrink: 0 }} className="relative w-full">
+            <div
+              key={reel.id}
+              className="relative w-full snap-start snap-always"
+              style={{ height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
+            >
               <ReelCard
                 reel={reel}
                 isActive={isActive}
@@ -527,11 +466,6 @@ const ReelsPage: React.FC = () => {
           );
         })}
       </div>
-      {refreshing && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-black/60 rounded-full p-2">
-          <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        </div>
-      )}
       <BottomNav overlay />
     </div>
   );

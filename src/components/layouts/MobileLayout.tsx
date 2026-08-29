@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, BookOpen, MessageCircle, User, Bell, Plus, Globe } from 'lucide-react';
+import { Home, Video, BookOpen, MessageCircle, User, Bell, Plus, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import LanguageSelector from '@/components/common/LanguageSelector';
@@ -34,7 +34,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
 
   const navItems = [
     { path: '/home', icon: Home, label: t('home') },
-    { path: '/search', icon: Search, label: t('search') },
+    { path: '/search', icon: Video, label: 'वीडियो' },
     { path: '/people', icon: Globe, label: 'लोग' },
     { path: '/stories', icon: BookOpen, label: t('stories') },
     { path: '/chat', icon: MessageCircle, label: t('chat') },

@@ -25,23 +25,60 @@ export interface ResetStart {
   expiresInMinutes?: number;
 }
 
-/** Edge function ka asli error message nikalta hai (warna sirf generic error milta hai). */
-async function invokeFn<T>(name: string, body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke(name, { body });
-  if (error) {
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.clone === 'function') {
-      try {
-        const parsed = await ctx.clone().json();
-        if (parsed?.error) throw new Error(parsed.error);
-      } catch (e) {
-        if (e instanceof Error && e.message && !/json/i.test(e.message)) throw e;
-      }
-    }
-    throw new Error(error.message || 'Server se jawab nahi mila. Dobara try karein.');
+/**
+ * Edge function call — pehle SDK se, aur agar browser/SDK level par request
+ * hi fail ho jaye ("Failed to send a request to the Edge Function") to seedha
+ * functions URL par fetch kar ke dobara koshish karte hain. Isse CORS/preflight
+ * ya SDK ki dikkat par bhi account finder kaam karta rehta hai.
+ */
+const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+async function directInvoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token ?? ANON_KEY;
+  const res = await fetch(`${FUNCTIONS_URL}/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  let parsed: unknown = null;
+  try { parsed = await res.json(); } catch { /* empty body */ }
+  const errMsg = (parsed as { error?: string } | null)?.error;
+  if (!res.ok || errMsg) {
+    throw new Error(errMsg || 'Server se jawab nahi mila. Dobara try karein.');
   }
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-  return data as T;
+  return parsed as T;
+}
+
+async function invokeFn<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  try {
+    const { data, error } = await supabase.functions.invoke(name, { body });
+    if (error) {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.clone === 'function') {
+        try {
+          const parsed = await ctx.clone().json();
+          if (parsed?.error) throw new Error(parsed.error);
+        } catch (e) {
+          if (e instanceof Error && e.message && !/json/i.test(e.message)) throw e;
+        }
+      }
+      // Network / relay level failure — direct fetch se dobara koshish
+      return await directInvoke<T>(name, body);
+    }
+    if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+    return data as T;
+  } catch (e) {
+    if (e instanceof Error && /failed to send|fetch|network|load failed/i.test(e.message)) {
+      return await directInvoke<T>(name, body);
+    }
+    throw e;
+  }
 }
 
 /**

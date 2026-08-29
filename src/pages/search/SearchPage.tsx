@@ -18,7 +18,7 @@ const SearchPage: React.FC = () => {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<YouTubeKind>("audio");
   const { play } = useYouTubePlayer();
-  const debouncedQuery = useDebounce(query, 400);
+  const debouncedQuery = useDebounce(query, 250);
 
   return (
     <MobileLayout>

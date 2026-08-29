@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, BookOpen, MessageCircle, User, Globe } from 'lucide-react';
+import { Home, Video, BookOpen, MessageCircle, User, Globe } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +9,7 @@ const BottomNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) => {
   const { t } = useLanguage();
   const navItems = [
     { path: '/home', icon: Home, label: t('home') },
-    { path: '/search', icon: Search, label: t('search') },
+    { path: '/search', icon: Video, label: 'वीडियो' },
     { path: '/people', icon: Globe, label: 'लोग' },
     { path: '/stories', icon: BookOpen, label: t('stories') },
     { path: '/chat', icon: MessageCircle, label: t('chat') },
