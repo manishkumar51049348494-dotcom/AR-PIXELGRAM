@@ -152,7 +152,12 @@ export async function getUserPosts(userId: string, currentUserId?: string): Prom
 }
 
 export async function deletePost(postId: string): Promise<void> {
-  await supabase.from('posts').delete().eq('id', postId);
+  // Pehle error ignore hota tha, isliye RLS/network fail hone par UI "deleted"
+  // dikhata tha aur refresh par post wapas aa jaati thi. Ab verify karte hain.
+  const { error } = await supabase.from('posts').delete().eq('id', postId);
+  if (error) throw error;
+  const { data } = await supabase.from('posts').select('id').eq('id', postId).maybeSingle();
+  if (data) throw new Error('Post delete nahi ho paayi — dobara try karein');
 }
 
 export async function getAllPosts(page = 0, pageSize = 20, currentUserId?: string): Promise<Post[]> {
@@ -205,7 +210,8 @@ export async function getComments(postId: string): Promise<Comment[]> {
 }
 
 export async function deleteComment(commentId: string): Promise<void> {
-  await supabase.from('comments').delete().eq('id', commentId);
+  const { error } = await supabase.from('comments').delete().eq('id', commentId);
+  if (error) throw error;
 }
 
 // ===================== SAVED POSTS =====================
@@ -251,7 +257,8 @@ export async function getFeedStories(userId: string): Promise<Story[]> {
 }
 
 export async function deleteStory(storyId: string): Promise<void> {
-  await supabase.from('stories').delete().eq('id', storyId);
+  const { error } = await supabase.from('stories').delete().eq('id', storyId);
+  if (error) throw error;
 }
 
 export async function getAllStories(page = 0, pageSize = 20): Promise<Story[]> {

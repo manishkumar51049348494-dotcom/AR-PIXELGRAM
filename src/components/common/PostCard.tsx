@@ -8,6 +8,7 @@ import type { Post, Comment } from '@/types/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import CommentsSheet from '@/components/common/CommentsSheet';
+import { retryMediaOnError } from '@/lib/mediaUrl';
 
 interface PostCardProps {
   post: Post;
@@ -115,6 +116,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete }) => {
       {/* Post image */}
       <div className="aspect-square w-full bg-muted overflow-hidden">
         <img
+          onError={(e) => retryMediaOnError(e.currentTarget, post.image_url)}
           src={post.image_url}
           alt={post.caption || 'Post'}
           className="w-full h-full object-cover"

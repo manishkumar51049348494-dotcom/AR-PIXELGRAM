@@ -13,7 +13,6 @@ import { CallProvider } from "@/contexts/CallContext";
 import { CallOverlay, IncomingCallModal } from "@/components/call/CallOverlay";
 import { routes } from "./routes";
 import { useVisitTracker } from "@/hooks/useVisitTracker";
-import { YouTubePlayerProvider } from "@/contexts/YouTubePlayerContext";
 
 const VisitTracker: React.FC = () => {
   useVisitTracker();
@@ -27,7 +26,6 @@ const App: React.FC = () => {
         <AuthProvider>
           <CallProvider>
             <VisitTracker />
-            <YouTubePlayerProvider>
               <RouteGuard>
                 <Routes>
                   {routes.map((route, index) => (
@@ -40,7 +38,6 @@ const App: React.FC = () => {
                   <Route path="*" element={<Navigate to="/home" replace />} />
                 </Routes>
               </RouteGuard>
-            </YouTubePlayerProvider>
             <IncomingCallModal />
             <CallOverlay />
           </CallProvider>

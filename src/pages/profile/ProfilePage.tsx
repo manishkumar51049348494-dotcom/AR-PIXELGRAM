@@ -12,12 +12,14 @@ import {
 import { supabase } from '@/db/supabase';
 import type { Profile, Post } from '@/types/types';
 import type { Reel } from '@/services/api';
+import { getUserVideos, formatVideoViews, formatDuration, type AppVideo } from '@/services/videos';
 import { Button } from '@/components/ui/button';
-import { Settings, BadgeCheck, Grid3X3, Lock, Loader2, Film, Camera, Flag, Play, Heart, MessageCircle, X } from 'lucide-react';
+import { Settings, BadgeCheck, Grid3X3, Lock, Loader2, Film, Camera, Flag, Play, Heart, MessageCircle, X, Video as VideoIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import PostCard from '@/components/common/PostCard';
 import { withTimeout } from '@/lib/withTimeout';
+import { retryMediaOnError } from '@/lib/mediaUrl';
 
 // username से unique gradient ring color
 function userGradient(username: string) {
@@ -48,12 +50,13 @@ const ProfilePage: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [openPost, setOpenPost] = useState<Post | null>(null);
   const [reels, setReels] = useState<Reel[]>([]);
+  const [videos, setVideos] = useState<AppVideo[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followStatus, setFollowStatus] = useState<'accepted' | 'pending' | null>(null);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'posts' | 'reels'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'videos'>('posts');
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
@@ -70,6 +73,9 @@ const ProfilePage: React.FC = () => {
       setProfile(p);
       setFollowersCount(fc);
       setFollowingCount(fgc);
+
+      // Uploaded long-form videos (public sabke liye, private sirf owner ko)
+      getUserVideos(targetUserId, user?.id).then(setVideos).catch(() => setVideos([]));
 
       if (!isOwnProfile && user) {
         const status = await getFollowStatus(user.id, targetUserId);
@@ -421,6 +427,21 @@ const ProfilePage: React.FC = () => {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('videos')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-bold transition-all border-b-2 ${
+                activeTab === 'videos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <VideoIcon className="w-4 h-4" />
+              वीडियो
+              {videos.length > 0 && (
+                <span className="ml-1 text-[10px] font-bold px-1.5 rounded-full text-primary-foreground"
+                  style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}>
+                  {videos.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -446,7 +467,7 @@ const ProfilePage: React.FC = () => {
                     onClick={() => setOpenPost(post)}
                     className="aspect-square bg-muted overflow-hidden group relative text-left"
                   >
-                    <img src={post.image_url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                    <img src={post.image_url} alt="" onError={(e) => retryMediaOnError(e.currentTarget, post.image_url)} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100">
                       <span className="flex items-center gap-1 text-white text-sm font-semibold">
                         <Heart className="w-4 h-4 fill-white" />{post.likes_count || 0}
@@ -506,7 +527,7 @@ const ProfilePage: React.FC = () => {
                   <div key={reel.id} className="aspect-[9/16] max-h-40 bg-black overflow-hidden group relative cursor-pointer"
                     onClick={() => navigate(`/reels?r=${reel.id}`)}>
                     {reel.thumbnail_url ? (
-                      <img src={reel.thumbnail_url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                      <img src={reel.thumbnail_url} alt="" onError={(e) => retryMediaOnError(e.currentTarget, reel.thumbnail_url)} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                     ) : (
                       <video src={reel.video_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
                     )}
@@ -518,6 +539,61 @@ const ProfilePage: React.FC = () => {
                       <span className="text-white text-[10px] font-semibold">{reel.views_count || 0}</span>
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {activeTab === 'videos' && (
+          <>
+            {!canSeePosts ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                <Lock className="w-12 h-12 text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">Follow this account to see their videos.</p>
+              </div>
+            ) : videos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                <VideoIcon className="w-12 h-12 text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">अभी कोई video upload नहीं हुआ</p>
+                {isOwnProfile && (
+                  <Button
+                    className="mt-4 rounded-full font-bold"
+                    style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))', border: 'none', color: 'white' }}
+                    onClick={() => navigate('/upload-video')}
+                  >
+                    + Add Video Create
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 px-2 py-2">
+                {videos.map(v => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => navigate(`/videos/${v.id}`)}
+                    className="text-left"
+                  >
+                    <div className="relative w-full rounded-xl overflow-hidden bg-muted" style={{ aspectRatio: '16 / 9' }}>
+                      {v.thumbnail_url ? (
+                        <img src={v.thumbnail_url} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <video src={v.video_url} className="absolute inset-0 w-full h-full object-cover" muted playsInline preload="metadata" />
+                      )}
+                      {formatDuration(v.duration_sec) && (
+                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-white text-[10px] font-semibold">
+                          {formatDuration(v.duration_sec)}
+                        </span>
+                      )}
+                      {v.visibility === 'private' && (
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] font-semibold flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Private
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-foreground line-clamp-2">{v.title}</p>
+                    <p className="text-[11px] text-muted-foreground">{formatVideoViews(v.views_count)} views</p>
+                  </button>
                 ))}
               </div>
             )}

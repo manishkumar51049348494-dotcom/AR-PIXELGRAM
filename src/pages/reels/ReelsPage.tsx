@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import ReelCommentsSheet from '@/components/common/ReelCommentsSheet';
 import BottomNav from '@/components/layouts/BottomNav';
+import { retryMediaOnError } from '@/lib/mediaUrl';
 
 // Only render video for active ± 1 reels — prevents loading all videos at once
 const RENDER_WINDOW = 2;
@@ -150,6 +151,7 @@ const ReelCard: React.FC<{
           // karte hi video turant chalti hai — koi 1 second ka kaala frame nahi.
           preload="auto"
           style={{ backgroundColor: '#000' }}
+          onError={(e) => retryMediaOnError(e.currentTarget, reel.video_url)}
           onClick={() => {
             const v = videoRef.current;
             if (!v) return;

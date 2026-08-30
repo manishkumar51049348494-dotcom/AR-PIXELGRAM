@@ -29,6 +29,12 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
       desc: 'Photo ya video post share karein',
     },
     {
+      path: '/upload-video',
+      icon: Video,
+      title: 'Add Video Create',
+      desc: 'Gallery se video upload karein (YouTube jaisa)',
+    },
+    {
       path: '/create-reel',
       icon: Clapperboard,
       title: t('newReel'),
@@ -47,7 +53,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
 
   const navItems = [
     { path: '/home', icon: Home, label: t('home') },
-    { path: '/search', icon: Video, label: 'वीडियो' },
+    { path: '/videos', icon: Video, label: 'वीडियो' },
     { path: '/people', icon: Globe, label: 'लोग' },
     { path: '/stories', icon: BookOpen, label: t('stories') },
     { path: '/chat', icon: MessageCircle, label: t('chat') },

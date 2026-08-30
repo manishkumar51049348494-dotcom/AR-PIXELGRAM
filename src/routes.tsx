@@ -5,7 +5,9 @@ import RegisterPage from './pages/auth/RegisterPage';
 import AccountDeletedPage from './pages/auth/AccountDeletedPage';
 import LandingPage from './pages/landing/LandingPage';
 import HomePage from './pages/home/HomePage';
-import SearchPage from './pages/search/SearchPage';
+import VideosPage from './pages/videos/VideosPage';
+import WatchVideoPage from './pages/videos/WatchVideoPage';
+import UploadVideoPage from './pages/videos/UploadVideoPage';
 import CreatePostPage from './pages/post/CreatePostPage';
 import StoriesPage from './pages/stories/StoriesPage';
 import ChatListPage from './pages/chat/ChatListPage';
@@ -54,7 +56,9 @@ export const routes: RouteConfig[] = [
 
   // Main app routes (require auth)
   { name: 'Home', path: '/home', element: <HomePage /> },
-  { name: 'Search', path: '/search', element: <SearchPage /> },
+  { name: 'Videos', path: '/videos', element: <VideosPage /> },
+  { name: 'Watch Video', path: '/videos/:videoId', element: <WatchVideoPage /> },
+  { name: 'Upload Video', path: '/upload-video', element: <UploadVideoPage /> },
   { name: 'Create Post', path: '/create', element: <CreatePostPage /> },
   { name: 'Stories', path: '/stories', element: <StoriesPage /> },
   { name: 'Reels', path: '/reels', element: <ReelsPage /> },
