@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import MobileLayout from '@/components/layouts/MobileLayout';
-import { getReelsByMusic, type Reel } from '@/services/api';
+import { getReelsByMusic, getReelById, type Reel } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Loader2, Music2, Play, Pause, Bookmark, Eye, Film } from 'lucide-react';
 import { getSavedSongs, saveSong, unsaveSong } from '@/services/savedSongs';
@@ -18,21 +18,37 @@ const SongPage: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
+  const [sourceReel, setSourceReel] = useState<Reel | null>(null);
+
+  // "original__<reelId>" => reel ka apna original audio (Instagram jaisa)
+  const isOriginal = !!trackId?.startsWith('original__');
+  const sourceReelId = isOriginal ? trackId!.slice('original__'.length) : null;
+
   useEffect(() => {
     if (!trackId) return;
     setLoading(true);
-    getReelsByMusic(trackId)
-      .then(setReels)
-      .catch(() => {})
+    Promise.all([
+      getReelsByMusic(trackId).catch(() => [] as Reel[]),
+      sourceReelId ? getReelById(sourceReelId).catch(() => null) : Promise.resolve(null),
+    ])
+      .then(([list, src]) => {
+        setSourceReel(src);
+        // source reel ko sabse pehle rakho, duplicate hata do
+        const merged = src ? [src, ...list.filter(r => r.id !== src.id)] : list;
+        setReels(merged);
+      })
       .finally(() => setLoading(false));
-  }, [trackId]);
+  }, [trackId, sourceReelId]);
 
   const first = reels[0];
-  const title = first?.music_title || 'Original audio';
-  const artist = first?.music_artist || 'AR Pixelgram';
-  const artwork = first?.music_artwork_url || undefined;
-  const preview = first?.music_preview_url || undefined;
-  const owner = first?.profile;
+  const ownerReel = sourceReel || first;
+  const title = isOriginal ? 'Original audio' : (first?.music_title || 'Original audio');
+  const artist = isOriginal
+    ? `@${ownerReel?.profile?.username || 'user'}`
+    : (first?.music_artist || 'AR Pixelgram');
+  const artwork = isOriginal ? (ownerReel?.thumbnail_url || undefined) : (first?.music_artwork_url || undefined);
+  const preview = isOriginal ? (ownerReel?.video_url || undefined) : (first?.music_preview_url || undefined);
+  const owner = ownerReel?.profile;
   const totalViews = reels.reduce((sum, r) => sum + (r.views_count || 0), 0);
 
   const asTrack = (): MusicTrack | null => {
@@ -81,7 +97,7 @@ const SongPage: React.FC = () => {
           <button onClick={() => navigate(-1)} className="p-1.5 rounded-full hover:bg-muted/60">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
-          <h1 className="font-bold text-foreground">Audio</h1>
+          <h1 className="font-bold text-foreground">{isOriginal ? 'Original audio' : 'Audio'}</h1>
         </div>
 
         {loading ? (
@@ -162,7 +178,7 @@ const SongPage: React.FC = () => {
             {reels.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center px-6">
                 <span className="text-4xl mb-2">🎵</span>
-                <p className="text-sm text-muted-foreground">इस गाने पर अभी कोई reel नहीं</p>
+                <p className="text-sm text-muted-foreground">इस audio पर अभी कोई reel नहीं</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-0.5 mt-0.5">

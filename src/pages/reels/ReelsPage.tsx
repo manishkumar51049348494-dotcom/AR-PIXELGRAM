@@ -285,9 +285,8 @@ const ReelCard: React.FC<{
         {/* Music info — Instagram jaisa, tap karo to song page khulta hai */}
         <button
           type="button"
-          disabled={!hasMusic || !reel.music_track_id}
-          onClick={() => { if (reel.music_track_id) navigate(`/song/${reel.music_track_id}`); }}
-          className="flex items-center gap-2 mt-1 max-w-full rounded-full bg-black/30 backdrop-blur px-2 py-1 disabled:opacity-100"
+          onClick={() => navigate(`/song/${reel.music_track_id || `original__${reel.id}`}`)}
+          className="flex items-center gap-2 mt-1 max-w-full rounded-full bg-black/30 backdrop-blur px-2 py-1"
         >
           {hasMusic && reel.music_artwork_url ? (
             <img
@@ -301,7 +300,9 @@ const ReelCard: React.FC<{
             </div>
           )}
           <span className="text-white/85 text-xs truncate max-w-[60%]">
-            {hasMusic ? `${reel.music_title} · ${reel.music_artist}` : 'AR Pixelgram Reel'}
+            {hasMusic
+              ? `${reel.music_title} · ${reel.music_artist}`
+              : `Original audio · @${profile?.username || 'user'}`}
           </span>
         </button>
       </div>
