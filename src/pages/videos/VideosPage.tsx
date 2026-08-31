@@ -90,7 +90,7 @@ const VideosPage: React.FC = () => {
     <MobileLayout>
       <div className="p-4 page-transition">
         {/* Search + voice + upload */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -110,27 +110,17 @@ const VideosPage: React.FC = () => {
               <Mic className={`w-4 h-4 ${listening ? 'text-white' : 'text-muted-foreground'}`} />
             </button>
           </div>
-        </div>
-
-        {/* Add video / create */}
-        <button
-          type="button"
-          onClick={() => navigate('/upload-video')}
-          className="w-full mb-4 flex items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left active:scale-[0.98] transition-transform"
-        >
-          <span
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0"
+          <button
+            type="button"
+            onClick={() => navigate('/upload-video')}
+            aria-label="Add video"
+            title="Add video"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
           >
             <Plus className="w-5 h-5" />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm font-bold text-foreground">Add Video Create</span>
-            <span className="block text-xs text-muted-foreground">
-              Gallery से video चुनें — title, thumbnail, private/public सब set करें
-            </span>
-          </span>
-        </button>
+          </button>
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-16 gap-2">

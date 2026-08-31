@@ -1053,8 +1053,12 @@ export async function toggleReelLike(reelId: string, userId: string, isLiked: bo
 }
 
 export async function deleteReel(reelId: string): Promise<void> {
+  // Verify karte hain, warna RLS/network fail hone par UI "deleted" dikhata
+  // tha aur refresh par reel wapas aa jaati thi.
   const { error } = await supabase.from('reels').delete().eq('id', reelId);
   if (error) throw error;
+  const { data } = await supabase.from('reels').select('id').eq('id', reelId).maybeSingle();
+  if (data) throw new Error('Reel delete nahi ho paayi — dobara try karein');
 }
 
 // ===================== REEL COMMENTS =====================
