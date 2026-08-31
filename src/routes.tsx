@@ -17,6 +17,7 @@ import ProfilePage from './pages/profile/ProfilePage';
 import EditProfilePage from './pages/profile/EditProfilePage';
 import SettingsPage from './pages/settings/SettingsPage';
 import AccountCenterPage from './pages/settings/AccountCenterPage';
+import LanguagePage from './pages/settings/LanguagePage';
 import NotificationSettingsPage from './pages/settings/NotificationSettingsPage';
 import ReelsPage from './pages/reels/ReelsPage';
 import CreateReelPage from './pages/reels/CreateReelPage';
@@ -74,6 +75,7 @@ export const routes: RouteConfig[] = [
   { name: 'Settings', path: '/settings', element: <SettingsPage /> },
   { name: 'Notification Settings', path: '/settings/notifications', element: <NotificationSettingsPage /> },
   { name: 'Account Center', path: '/settings/account-center', element: <AccountCenterPage /> },
+  { name: 'Language', path: '/settings/language', element: <LanguagePage /> },
   { name: 'Report User', path: '/report-user/:userId', element: <ReportUserPage /> },
   { name: 'Followers', path: '/followers/:userId', element: <FollowListPage /> },
   { name: 'Following', path: '/following/:userId', element: <FollowListPage /> },

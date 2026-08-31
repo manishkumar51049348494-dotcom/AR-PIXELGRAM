@@ -1,9 +1,8 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Video, BookOpen, MessageCircle, User, Bell, Plus, Globe, ImagePlus, Clapperboard, X } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Home, Video, BookOpen, MessageCircle, User, Bell, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import LanguageSelector from '@/components/common/LanguageSelector';
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import { cn } from '@/lib/utils';
 
@@ -15,33 +14,9 @@ interface MobileLayoutProps {
 
 const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, fullscreen = false }) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { profile, user } = useAuth();
   const { t } = useLanguage();
   const unreadNotifications = useUnreadNotifications(user?.id);
-  const [createOpen, setCreateOpen] = React.useState(false);
-
-  const createOptions = [
-    {
-      path: '/create',
-      icon: ImagePlus,
-      title: t('newPost'),
-      desc: 'Photo ya video post share karein',
-    },
-    {
-      path: '/upload-video',
-      icon: Video,
-      title: 'Add Video Create',
-      desc: 'Gallery se video upload karein (YouTube jaisa)',
-    },
-    {
-      path: '/create-reel',
-      icon: Clapperboard,
-      title: t('newReel'),
-      desc: 'Music aur cover ke saath reel banayein',
-    },
-  ];
-
   // fullscreen mode — reels की तरह pure black, no header, no nav
   if (fullscreen) {
     return (
@@ -67,27 +42,9 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
         {/* Logo with animated rainbow */}
         <Link to="/home" className="flex items-center gap-2">
           <span className="text-xl font-black rainbow-text tracking-tight">AR Pixelgram</span>
-          {profile?.is_verified && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-primary-foreground glow-badge"
-              style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}>
-              ✓
-            </span>
-          )}
         </Link>
 
         <div className="flex items-center gap-1">
-          {/* Language selector */}
-          <LanguageSelector compact />
-
-          {/* Create button — Instagram-style bottom sheet */}
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-95"
-            style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-
           {/* Notifications */}
           <Link to="/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
             <Bell className="w-5 h-5 text-foreground" />
@@ -138,45 +95,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
         </nav>
       )}
 
-      {/* Premium create sheet (Instagram jaisa) */}
-      {createOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setCreateOpen(false)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div
-            className="relative w-full max-w-lg rounded-t-3xl bg-background border-t border-border/50 px-5 pt-3 pb-8 safe-bottom shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-bold text-foreground">Create</h2>
-              <button onClick={() => setCreateOpen(false)} className="p-1.5 rounded-full hover:bg-muted/60">
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {createOptions.map(({ path, icon: Icon, title, desc }) => (
-                <button
-                  key={path}
-                  onClick={() => { setCreateOpen(false); navigate(path); }}
-                  className="w-full flex items-center gap-4 rounded-2xl border border-border/40 bg-card px-4 py-3.5 text-left transition-all active:scale-[0.98] hover:border-primary/40"
-                >
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center text-primary-foreground shrink-0"
-                    style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground">{title}</p>
-                    <p className="text-xs text-muted-foreground">{desc}</p>
-                  </div>
-                  <Plus className="w-4 h-4 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

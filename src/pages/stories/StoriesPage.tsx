@@ -265,6 +265,15 @@ const StoriesPage: React.FC = () => {
       <div className="page-transition">
         {/* Stories row */}
         <div className="flex items-start gap-3 px-4 py-4 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {/* Post upload button */}
+          <button onClick={() => navigate('/create')} className="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-md transition-transform group-active:scale-95"
+              style={{ background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}>
+              <ImagePlus className="w-6 h-6" />
+            </div>
+            <span className="text-[11px] text-muted-foreground w-16 text-center truncate">Post</span>
+          </button>
+
           {/* Add story button */}
           <button onClick={() => setShowUpload(true)} className="flex flex-col items-center gap-1.5 shrink-0 group">
             <div className="w-16 h-16 rounded-full border-2 border-dashed border-primary/50 flex items-center justify-center bg-primary/5 group-hover:bg-primary/10 transition-all group-hover:border-primary">

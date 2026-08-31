@@ -204,6 +204,14 @@ const ReelCard: React.FC<{
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           <span className="text-white text-xs font-bold tracking-widest">{t('reels').toUpperCase()}</span>
         </div>
+        <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate('/create-reel')}
+          className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+          aria-label="Create reel"
+        >
+          <Plus className="w-5 h-5 text-white" />
+        </button>
         {isOwner ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -217,7 +225,8 @@ const ReelCard: React.FC<{
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        ) : <div className="w-9" />}
+        ) : null}
+        </div>
       </div>
 
       {/* Right side actions */}

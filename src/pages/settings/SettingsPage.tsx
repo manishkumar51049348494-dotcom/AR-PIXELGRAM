@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, KeyRound, AtSign } from 'lucide-react';
+import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, KeyRound, AtSign, Globe } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
@@ -246,6 +246,7 @@ const SettingsPage: React.FC = () => {
           { icon: KeyRound, label: 'Change Password', desc: 'OTP se apna password reset karo', onClick: () => navigate('/forgot-password'), danger: false },
           { icon: BadgeCheck, label: 'Request Verification', desc: profile?.is_verified ? 'Already verified ✓' : 'Get the blue badge', onClick: () => setSection('verification'), danger: false },
           { icon: AtSign, label: 'Account Center', desc: 'Email aur phone number add/manage karein', onClick: () => navigate('/settings/account-center'), danger: false },
+          { icon: Globe, label: 'Language', desc: 'App ki bhasha chunein / Select your language', onClick: () => navigate('/settings/language'), danger: false },
           { icon: HelpCircle, label: 'Help Center', desc: 'FAQs and support', onClick: () => setSection('help'), danger: false },
           { icon: Flag, label: 'Report a Problem', desc: "Let us know what's wrong", onClick: () => setSection('report'), danger: false },
           { icon: Shield, label: 'Privacy', desc: 'Manage your privacy settings', onClick: () => navigate('/edit-profile'), danger: false },
