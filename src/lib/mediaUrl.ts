@@ -1,12 +1,37 @@
 import { supabase } from '@/db/supabase';
 
 /**
- * Purane post / reel ka media kabhi-kabhi load nahi hota (bucket setting ya
- * CDN cache ke wajah se) — tab screen kaali dikhti thi. Yahan se hum usi
- * object ka signed URL bana kar dobara try karte hain, isliye kitne bhi
- * purana video/photo ho, waise hi dikhta hai jaise upload hua tha.
+ * Purane post / reel ka media kabhi-kabhi load nahi hota. Do wajah hoti hain:
+ *
+ * 1. Media isi project me hai lekin bucket/CDN setting ki wajah se public URL
+ *    fail karta hai — uska hal signed URL hai (niche resolveMediaUrl).
+ * 2. Media PURANE (ab band ho chuke) Supabase project par pada tha. Uska host
+ *    ab exist hi nahi karta, isliye photo safed aur reel kaali dikhti thi.
+ *    Aise media ko hum pehchan kar saaf message dikhate hain, taaki user ko
+ *    khali safed/kaala box na dikhe.
  */
 const cache = new Map<string, string>();
+
+const CURRENT_HOST = (() => {
+  try {
+    return new URL(import.meta.env.VITE_SUPABASE_URL as string).host;
+  } catch {
+    return '';
+  }
+})();
+
+/** Kya yeh media kisi purane/band Supabase project ka hai? */
+export function isLegacyMediaUrl(url?: string | null): boolean {
+  if (!url) return false;
+  if (!/^https?:\/\//i.test(url)) return false;
+  try {
+    const host = new URL(url).host;
+    if (!host.endsWith('.supabase.co') && !host.endsWith('.supabase.in')) return false;
+    return CURRENT_HOST !== '' && host !== CURRENT_HOST;
+  } catch {
+    return false;
+  }
+}
 
 function parsePublicUrl(url: string): { bucket: string; path: string } | null {
   const m = url.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:\?|$)/);
@@ -17,16 +42,21 @@ function parsePublicUrl(url: string): { bucket: string; path: string } | null {
 /** Signed URL (7 din) — fail hone par null. */
 export async function resolveMediaUrl(url?: string | null): Promise<string | null> {
   if (!url) return null;
+  if (isLegacyMediaUrl(url)) return null;
   const cached = cache.get(url);
   if (cached) return cached;
   const parsed = parsePublicUrl(url);
   if (!parsed) return null;
-  const { data } = await supabase.storage
-    .from(parsed.bucket)
-    .createSignedUrl(parsed.path, 60 * 60 * 24 * 7);
-  if (!data?.signedUrl) return null;
-  cache.set(url, data.signedUrl);
-  return data.signedUrl;
+  try {
+    const { data } = await supabase.storage
+      .from(parsed.bucket)
+      .createSignedUrl(parsed.path, 60 * 60 * 24 * 7);
+    if (!data?.signedUrl) return null;
+    cache.set(url, data.signedUrl);
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
 }
 
 /**

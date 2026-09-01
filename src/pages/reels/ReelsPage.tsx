@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Plus, BadgeCheck } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Plus, BadgeCheck, VideoOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getReelsFeed, getReelById, recordReelView, toggleReelLike, deleteReel, createNotification, getReelCommentsCount, type Reel } from '@/services/api';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import ReelCommentsSheet from '@/components/common/ReelCommentsSheet';
 import BottomNav from '@/components/layouts/BottomNav';
-import { retryMediaOnError } from '@/lib/mediaUrl';
+import { retryMediaOnError, isLegacyMediaUrl } from '@/lib/mediaUrl';
 
 // Only render video for active ± 1 reels — prevents loading all videos at once
 const RENDER_WINDOW = 2;
@@ -137,8 +137,14 @@ const ReelCard: React.FC<{
 
   return (
     <div className="relative w-full h-full bg-black select-none">
-      {/* Only mount video element when near active — prevents loading 30 videos at once */}
-      {isNear ? (
+      {/* Purane (band ho chuke) server ka video kabhi chalega nahi — kaali
+          screen ki jagah saaf message dikhao. */}
+      {isLegacyMediaUrl(reel.video_url) ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black text-white/70 px-8 text-center">
+          <VideoOff className="w-10 h-10" />
+          <p className="text-sm">Yeh reel purane server par thi, video ab available nahi hai.</p>
+        </div>
+      ) : isNear ? (
         <video
           ref={videoRef}
           src={reel.video_url}

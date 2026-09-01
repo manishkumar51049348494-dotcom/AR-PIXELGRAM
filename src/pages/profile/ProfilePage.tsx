@@ -19,7 +19,8 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import PostCard from '@/components/common/PostCard';
 import { withTimeout } from '@/lib/withTimeout';
-import { retryMediaOnError } from '@/lib/mediaUrl';
+import { SmartImage } from '@/components/common/SmartMedia';
+import { isLegacyMediaUrl } from '@/lib/mediaUrl';
 
 // username से unique gradient ring color
 function userGradient(username: string) {
@@ -467,7 +468,7 @@ const ProfilePage: React.FC = () => {
                     onClick={() => setOpenPost(post)}
                     className="aspect-square bg-muted overflow-hidden group relative text-left"
                   >
-                    <img src={post.image_url} alt="" onError={(e) => retryMediaOnError(e.currentTarget, post.image_url)} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                    <SmartImage src={post.image_url} compact className="transition-transform group-hover:scale-105" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100">
                       <span className="flex items-center gap-1 text-white text-sm font-semibold">
                         <Heart className="w-4 h-4 fill-white" />{post.likes_count || 0}
@@ -527,9 +528,13 @@ const ProfilePage: React.FC = () => {
                   <div key={reel.id} className="aspect-[9/16] max-h-40 bg-black overflow-hidden group relative cursor-pointer"
                     onClick={() => navigate(`/reels?r=${reel.id}`)}>
                     {reel.thumbnail_url ? (
-                      <img src={reel.thumbnail_url} alt="" onError={(e) => retryMediaOnError(e.currentTarget, reel.thumbnail_url)} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                      <SmartImage src={reel.thumbnail_url} compact className="transition-transform group-hover:scale-105" />
+                    ) : (
+                      isLegacyMediaUrl(reel.video_url) ? (
+                      <SmartImage src={null} compact />
                     ) : (
                       <video src={reel.video_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                    )
                     )}
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                       <Play className="w-6 h-6 text-white drop-shadow-lg" fill="white" />

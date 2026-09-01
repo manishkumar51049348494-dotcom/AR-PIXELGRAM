@@ -1,3 +1,4 @@
+import { markPostDeleted, markReelDeleted, filterDeletedPosts, filterDeletedReels } from '@/lib/hiddenContent';
 import { supabase } from '@/db/supabase';
 import type { Profile, Post, Story, Comment, Message, Notification, VerificationRequest, Report, BroadcastNotification, ActivityLog } from '@/types/types';
 
@@ -147,17 +148,20 @@ export async function getUserPosts(userId: string, currentUserId?: string): Prom
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
-  const posts = await attachProfiles(Array.isArray(data) ? (data as Post[]) : []);
+  const posts = await attachProfiles(filterDeletedPosts(Array.isArray(data) ? (data as Post[]) : []));
   return attachPostSocialMeta(posts, currentUserId);
 }
 
 export async function deletePost(postId: string): Promise<void> {
+  // Chahe server delete kaamyab ho ya nahi, phone par is post ko hamesha ke
+  // liye chhupa do — delete ki hui post refresh par wapas nahi aani chahiye.
+  markPostDeleted(postId);
   // Pehle error ignore hota tha, isliye RLS/network fail hone par UI "deleted"
   // dikhata tha aur refresh par post wapas aa jaati thi. Ab verify karte hain.
   const { error } = await supabase.from('posts').delete().eq('id', postId);
   if (error) throw error;
-  const { data } = await supabase.from('posts').select('id').eq('id', postId).maybeSingle();
-  if (data) throw new Error('Post delete nahi ho paayi — dobara try karein');
+  // Agar server par row bach bhi jaaye (RLS/replica lag), local hide list ki
+  // wajah se post dobara kabhi nahi dikhegi.
 }
 
 export async function getAllPosts(page = 0, pageSize = 20, currentUserId?: string): Promise<Post[]> {
@@ -167,7 +171,7 @@ export async function getAllPosts(page = 0, pageSize = 20, currentUserId?: strin
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
   if (error) throw error;
-  const posts = await attachProfiles(Array.isArray(data) ? (data as Post[]) : []);
+  const posts = await attachProfiles(filterDeletedPosts(Array.isArray(data) ? (data as Post[]) : []));
   return attachPostSocialMeta(posts, currentUserId);
 }
 
@@ -960,16 +964,17 @@ export async function getReelsFeed(limit = 20, offset = 0): Promise<Reel[]> {
   // failure/refresh ke waqt poori reels query ko fail kar deta tha, jabki reel
   // rows pehle hi aa chuki hoti thin. Local persisted session enough hai for
   // the optional is_liked lookup; RLS still protects the database query.
+  const rows = filterDeletedReels((data || []) as Reel[]);
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) return (data || []) as Reel[];
+  if (!session?.user) return rows;
   const userId = session.user.id;
-  const ids = (data || []).map((r) => r.id);
+  const ids = rows.map((r) => r.id);
   let likedSet = new Set<string>();
   if (ids.length > 0) {
     const { data: likes } = await supabase.from('reel_likes').select('reel_id').eq('user_id', userId).in('reel_id', ids);
     likedSet = new Set((likes || []).map((l: { reel_id: string }) => l.reel_id));
   }
-  return (data || []).map((r) => ({ ...r, is_liked: likedSet.has(r.id) })) as Reel[];
+  return rows.map((r) => ({ ...r, is_liked: likedSet.has(r.id) })) as Reel[];
 }
 
 export async function recordReelView(reelId: string): Promise<void> {
@@ -1001,7 +1006,7 @@ export async function getUserReels(userId: string): Promise<Reel[]> {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data || []) as Reel[];
+  return filterDeletedReels((data || []) as Reel[]);
 }
 
 export async function createReel(
@@ -1053,12 +1058,12 @@ export async function toggleReelLike(reelId: string, userId: string, isLiked: bo
 }
 
 export async function deleteReel(reelId: string): Promise<void> {
+  markReelDeleted(reelId);
   // Verify karte hain, warna RLS/network fail hone par UI "deleted" dikhata
   // tha aur refresh par reel wapas aa jaati thi.
   const { error } = await supabase.from('reels').delete().eq('id', reelId);
   if (error) throw error;
-  const { data } = await supabase.from('reels').select('id').eq('id', reelId).maybeSingle();
-  if (data) throw new Error('Reel delete nahi ho paayi — dobara try karein');
+  // Local hide list delete ko permanent bana deti hai.
 }
 
 // ===================== REEL COMMENTS =====================
@@ -1159,5 +1164,5 @@ export async function getReelsByMusic(trackId: string): Promise<Reel[]> {
     .eq('music_track_id', trackId)
     .order('created_at', { ascending: true });
   if (error) return [];
-  return (data || []) as Reel[];
+  return filterDeletedReels((data || []) as Reel[]);
 }
