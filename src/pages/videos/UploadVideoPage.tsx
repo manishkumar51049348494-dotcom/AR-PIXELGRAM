@@ -312,7 +312,9 @@ const UploadVideoPage: React.FC = () => {
                 style={{ width: `${progress}%`, background: 'linear-gradient(135deg, hsl(var(--p1)), hsl(var(--p2)))' }}
               />
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{progress}% upload हुआ — app बंद न करें</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {progress}% upload हुआ — आप app में दूसरी videos देख सकते हैं
+            </p>
           </div>
         )}
       </div>

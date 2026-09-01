@@ -1,5 +1,6 @@
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
+import * as tus from 'tus-js-client';
 
 /**
  * Long-form video (YouTube jaisa) — reels se alag.
@@ -84,8 +85,10 @@ async function currentUserId(): Promise<string | undefined> {
 /* ------------------------------- uploads -------------------------------- */
 
 /**
- * Bade video (film / gaana / comedy) ke liye XHR upload — isse asli progress
- * percentage milta hai. supabase-js ka upload progress event nahi deta.
+ * Large videos use Storage's resumable TUS endpoint. A direct POST sends the
+ * whole file as one request and is rejected with 413 for larger videos.
+ * TUS sends fixed 6 MB chunks, retries interrupted networks, and remembers an
+ * unfinished upload so selecting the same file again can continue it.
  */
 export function uploadVideoFile(
   file: File,
@@ -98,27 +101,50 @@ export function uploadVideoFile(
     const base = import.meta.env.VITE_SUPABASE_URL as string;
     const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-    supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token || anon;
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${base}/storage/v1/object/${BUCKET}/${path}`, true);
-      xhr.setRequestHeader('authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('apikey', anon);
-      xhr.setRequestHeader('x-upsert', 'true');
-      if (file.type) xhr.setRequestHeader('content-type', file.type);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error || !data.session?.access_token) {
+        reject(new Error('Session expire ho gaya — login karke dobara try karein'));
+        return;
+      }
+
+      const upload = new tus.Upload(file, {
+        endpoint: `${base}/storage/v1/upload/resumable`,
+        headers: {
+          authorization: `Bearer ${data.session.access_token}`,
+          apikey: anon,
+          'x-upsert': 'false',
+        },
+        chunkSize: 6 * 1024 * 1024,
+        retryDelays: [0, 1000, 3000, 5000, 10000, 20000],
+        removeFingerprintOnSuccess: true,
+        metadata: {
+          bucketName: BUCKET,
+          objectName: path,
+          contentType: file.type || 'video/mp4',
+          cacheControl: '31536000',
+        },
+        onError: (uploadError) => {
+          console.error('resumable video upload failed', uploadError);
+          reject(new Error('Upload ruk gaya — internet check karke wahi video dobara select karein'));
+        },
+        onProgress: (uploaded, total) => {
+          if (total > 0) onProgress?.(Math.min(99, Math.round((uploaded / total) * 100)));
+        },
+        onSuccess: () => {
+          onProgress?.(100);
           const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
           resolve(urlData.publicUrl);
-        } else {
-          reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
-        }
-      };
-      xhr.onerror = () => reject(new Error('Network problem — upload fail hua'));
-      xhr.send(file);
+        },
+      });
+
+      try {
+        const previous = await upload.findPreviousUploads();
+        if (previous.length > 0) upload.resumeFromPreviousUpload(previous[0]);
+        upload.start();
+      } catch (resumeError) {
+        console.warn('Could not inspect previous upload; starting fresh', resumeError);
+        upload.start();
+      }
     }, reject);
   });
 }
