@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
+import { purgeLegacyMediaForUser } from '@/lib/legacyCleanup';
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
 import { getProfile } from '@/services/api';
@@ -101,6 +102,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Purane band ho chuke project wale broken post/reel apne aap database se
+  // hata do (sirf apne hi rows, ek baar).
+  useEffect(() => {
+    if (user?.id) void purgeLegacyMediaForUser(user.id);
+  }, [user?.id]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

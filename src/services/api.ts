@@ -1,4 +1,5 @@
 import { markPostDeleted, markReelDeleted, filterDeletedPosts, filterDeletedReels } from '@/lib/hiddenContent';
+import { dropLegacyPosts, dropLegacyReels } from '@/lib/legacyCleanup';
 import { supabase } from '@/db/supabase';
 import type { Profile, Post, Story, Comment, Message, Notification, VerificationRequest, Report, BroadcastNotification, ActivityLog } from '@/types/types';
 
@@ -137,7 +138,7 @@ export async function getHomeFeed(userId: string, page = 0, pageSize = 10): Prom
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
 
-  const posts = await attachProfiles(Array.isArray(data) ? (data as Post[]) : []);
+  const posts = await attachProfiles(filterDeletedPosts(dropLegacyPosts(Array.isArray(data) ? (data as Post[]) : [])));
   return attachPostSocialMeta(posts, userId);
 }
 
@@ -148,7 +149,7 @@ export async function getUserPosts(userId: string, currentUserId?: string): Prom
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
-  const posts = await attachProfiles(filterDeletedPosts(Array.isArray(data) ? (data as Post[]) : []));
+  const posts = await attachProfiles(filterDeletedPosts(dropLegacyPosts(Array.isArray(data) ? (data as Post[]) : [])));
   return attachPostSocialMeta(posts, currentUserId);
 }
 
@@ -171,7 +172,7 @@ export async function getAllPosts(page = 0, pageSize = 20, currentUserId?: strin
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
   if (error) throw error;
-  const posts = await attachProfiles(filterDeletedPosts(Array.isArray(data) ? (data as Post[]) : []));
+  const posts = await attachProfiles(filterDeletedPosts(dropLegacyPosts(Array.isArray(data) ? (data as Post[]) : [])));
   return attachPostSocialMeta(posts, currentUserId);
 }
 
@@ -964,7 +965,7 @@ export async function getReelsFeed(limit = 20, offset = 0): Promise<Reel[]> {
   // failure/refresh ke waqt poori reels query ko fail kar deta tha, jabki reel
   // rows pehle hi aa chuki hoti thin. Local persisted session enough hai for
   // the optional is_liked lookup; RLS still protects the database query.
-  const rows = filterDeletedReels((data || []) as Reel[]);
+  const rows = filterDeletedReels(dropLegacyReels((data || []) as Reel[]));
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return rows;
   const userId = session.user.id;
@@ -1006,7 +1007,7 @@ export async function getUserReels(userId: string): Promise<Reel[]> {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return filterDeletedReels((data || []) as Reel[]);
+  return filterDeletedReels(dropLegacyReels((data || []) as Reel[]));
 }
 
 export async function createReel(
@@ -1164,5 +1165,5 @@ export async function getReelsByMusic(trackId: string): Promise<Reel[]> {
     .eq('music_track_id', trackId)
     .order('created_at', { ascending: true });
   if (error) return [];
-  return filterDeletedReels((data || []) as Reel[]);
+  return filterDeletedReels(dropLegacyReels((data || []) as Reel[]));
 }
