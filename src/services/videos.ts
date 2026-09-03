@@ -86,68 +86,138 @@ async function currentUserId(): Promise<string | undefined> {
 /* ------------------------------- uploads -------------------------------- */
 
 /**
- * Large videos use Storage's resumable TUS endpoint. A direct POST sends the
- * whole file as one request and is rejected with 413 for larger videos.
- * TUS sends fixed 6 MB chunks, retries interrupted networks, and remembers an
- * unfinished upload so selecting the same file again can continue it.
+ * Video upload — pehle normal (direct) upload try hota hai kyunki wo sabse
+ * reliable hai. Bade video ya 413 aane par resumable TUS chunks se upload
+ * hota hai. Har failure par asli reason user ko dikhaya jata hai.
  */
-export function uploadVideoFile(
+function humanUploadError(err: unknown): string {
+  const anyErr = err as { message?: string; originalResponse?: { getStatus?: () => number; getBody?: () => string } } | null;
+  const status = anyErr?.originalResponse?.getStatus?.();
+  const body = anyErr?.originalResponse?.getBody?.() || '';
+  const raw = `${anyErr?.message || ''} ${body}`.toLowerCase();
+
+  if (status === 413 || raw.includes('exceeded the maximum allowed size') || raw.includes('payload too large')) {
+    return 'Video bahut bada hai — chhota video ya kam quality wala select karein';
+  }
+  if (status === 401 || status === 403 || raw.includes('unauthorized') || raw.includes('row-level security')) {
+    return 'Login session expire ho gaya — dobara login karke try karein';
+  }
+  if (raw.includes('bucket not found')) {
+    return 'Storage bucket "videos" nahi mila — admin se contact karein';
+  }
+  if (raw.includes('already exists')) {
+    return 'Ye file pehle se upload ho chuki hai — dobara try karein';
+  }
+  if (status === 404 || status === 410) {
+    return 'Purana adhoora upload expire ho gaya — video dobara select karein';
+  }
+  if (raw.includes('failed to fetch') || raw.includes('network')) {
+    return 'Internet slow/disconnect hua — network check karke dobara try karein';
+  }
+  return anyErr?.message ? `Upload fail hua: ${anyErr.message}` : 'Upload fail hua — dobara try karein';
+}
+
+function resumableUpload(
+  file: File,
+  path: string,
+  accessToken: string,
+  onProgress?: (percent: number) => void,
+  fresh = false,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const base = import.meta.env.VITE_SUPABASE_URL as string;
+    const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+    const upload = new tus.Upload(file, {
+      endpoint: `${base}/storage/v1/upload/resumable`,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        apikey: anon,
+        'x-upsert': 'true',
+      },
+      uploadDataDuringCreation: true,
+      chunkSize: 6 * 1024 * 1024,
+      retryDelays: [0, 1000, 3000, 5000, 10000],
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        bucketName: BUCKET,
+        objectName: path,
+        contentType: file.type || 'video/mp4',
+        cacheControl: '31536000',
+      },
+      onError: (uploadError) => {
+        console.error('resumable video upload failed', uploadError);
+        reject(uploadError);
+      },
+      onProgress: (uploaded, total) => {
+        if (total > 0) onProgress?.(Math.min(99, Math.round((uploaded / total) * 100)));
+      },
+      onSuccess: () => {
+        onProgress?.(100);
+        resolve();
+      },
+    });
+
+    void (async () => {
+      try {
+        const previous = await upload.findPreviousUploads();
+        if (!fresh && previous.length > 0) {
+          upload.resumeFromPreviousUpload(previous[0]);
+        }
+      } catch (resumeError) {
+        console.warn('Could not inspect previous upload; starting fresh', resumeError);
+      }
+      upload.start();
+    })();
+  });
+}
+
+export async function uploadVideoFile(
   file: File,
   userId: string,
   onProgress?: (percent: number) => void,
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
-    const path = `${userId}/${Date.now()}.${ext}`;
-    const base = import.meta.env.VITE_SUPABASE_URL as string;
-    const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+  const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+  const path = `${userId}/${Date.now()}.${ext}`;
 
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error || !data.session?.access_token) {
-        reject(new Error('Session expire ho gaya — login karke dobara try karein'));
-        return;
-      }
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session?.access_token) {
+    throw new Error('Session expire ho gaya — login karke dobara try karein');
+  }
+  const accessToken = sessionData.session.access_token;
 
-      const upload = new tus.Upload(file, {
-        endpoint: `${base}/storage/v1/upload/resumable`,
-        headers: {
-          authorization: `Bearer ${data.session.access_token}`,
-          apikey: anon,
-          'x-upsert': 'false',
-        },
-        chunkSize: 6 * 1024 * 1024,
-        retryDelays: [0, 1000, 3000, 5000, 10000, 20000],
-        removeFingerprintOnSuccess: true,
-        metadata: {
-          bucketName: BUCKET,
-          objectName: path,
-          contentType: file.type || 'video/mp4',
-          cacheControl: '31536000',
-        },
-        onError: (uploadError) => {
-          console.error('resumable video upload failed', uploadError);
-          reject(new Error('Upload ruk gaya — internet check karke wahi video dobara select karein'));
-        },
-        onProgress: (uploaded, total) => {
-          if (total > 0) onProgress?.(Math.min(99, Math.round((uploaded / total) * 100)));
-        },
-        onSuccess: () => {
-          onProgress?.(100);
-          const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-          resolve(urlData.publicUrl);
-        },
-      });
+  const publicUrl = () => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
-      try {
-        const previous = await upload.findPreviousUploads();
-        if (previous.length > 0) upload.resumeFromPreviousUpload(previous[0]);
-        upload.start();
-      } catch (resumeError) {
-        console.warn('Could not inspect previous upload; starting fresh', resumeError);
-        upload.start();
-      }
-    }, reject);
-  });
+  // Chhote videos: seedha upload (fast + sabse reliable).
+  const DIRECT_LIMIT = 45 * 1024 * 1024;
+  if (file.size <= DIRECT_LIMIT) {
+    onProgress?.(5);
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+      contentType: file.type || 'video/mp4',
+      cacheControl: '31536000',
+      upsert: true,
+    });
+    if (!error) {
+      onProgress?.(100);
+      return publicUrl();
+    }
+    console.warn('direct video upload failed, trying resumable', error);
+  }
+
+  try {
+    await resumableUpload(file, path, accessToken, onProgress);
+    return publicUrl();
+  } catch (firstError) {
+    // Adhoore/expire ho chuke upload ki wajah se fail hua ho to fresh try.
+    try {
+      onProgress?.(0);
+      const retryPath = `${userId}/${Date.now()}_retry.${ext}`;
+      await resumableUpload(file, retryPath, accessToken, onProgress, true);
+      return supabase.storage.from(BUCKET).getPublicUrl(retryPath).data.publicUrl;
+    } catch (secondError) {
+      throw new Error(humanUploadError(secondError || firstError));
+    }
+  }
 }
 
 export async function uploadVideoThumbnail(blob: Blob, userId: string): Promise<string> {
