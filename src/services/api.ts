@@ -61,7 +61,12 @@ export async function getAllProfiles(page = 0, pageSize = 20): Promise<Profile[]
 
 // ===================== POSTS =====================
 export async function createPost(imageUrl: string, caption: string | null): Promise<void> {
-  await supabase.from('posts').insert({ image_url: imageUrl, caption });
+  const { data } = await supabase
+    .from('posts')
+    .insert({ image_url: imageUrl, caption })
+    .select('id, user_id')
+    .maybeSingle();
+  if (data?.user_id) void notifyFollowersOfNewContent(data.user_id, 'new_post', data.id, caption);
 }
 
 // posts.user_id ka foreign key auth.users par hai, profiles par nahi — isliye
@@ -235,7 +240,12 @@ export async function isSaved(postId: string, userId: string): Promise<boolean> 
 
 // ===================== STORIES =====================
 export async function createStory(imageUrl: string, caption: string | null): Promise<void> {
-  await supabase.from('stories').insert({ image_url: imageUrl, caption });
+  const { data } = await supabase
+    .from('stories')
+    .insert({ image_url: imageUrl, caption })
+    .select('id, user_id')
+    .maybeSingle();
+  if (data?.user_id) void notifyFollowersOfNewContent(data.user_id, 'new_story', data.id, caption);
 }
 
 export async function getFeedStories(userId: string): Promise<Story[]> {
@@ -481,6 +491,10 @@ export async function createNotification(
     follow_accepted: `${who} accepted your follow request`,
     message: `New message from ${who}`,
     new_story: `${who} added a new story`,
+    story_reply: `${who} replied to your story`,
+    new_post: `${who} added a new post`,
+    new_reel: `${who} added a new reel`,
+    new_video: `${who} uploaded a new video`,
   };
   const title = titles[type];
   if (!title || message?.startsWith('📞') || message?.startsWith('📵')) return;
@@ -498,13 +512,132 @@ export async function createNotification(
       data: {
         url: type === 'message' && actorId
           ? `/chat/${actorId}`
-          : type === 'new_story' && actorId
+          : (type === 'new_story' || type === 'story_reply') && actorId
             ? `/stories?u=${actorId}`
-            : isReelType ? reelUrl : '/notifications',
+            : type === 'new_video'
+              ? (postId ? `/videos/${postId}` : '/videos')
+              : type === 'new_post'
+                ? (postId ? `/post/${postId}` : '/')
+                : isReelType || type === 'new_reel' ? reelUrl : '/notifications',
         icon: actor?.avatar_url || '/images/logo/logo-icon.svg',
       },
     },
   }).catch(() => {});
+}
+
+/** Sirf push bhejne ke liye (DB row already ho ya na ho). */
+export async function sendPushTo(
+  receiverId: string,
+  title: string,
+  body: string,
+  url: string,
+  tag?: string,
+  icon?: string | null,
+): Promise<void> {
+  try {
+    await supabase.functions.invoke('send-call-push', {
+      body: {
+        receiverId,
+        title,
+        body,
+        tag: tag || `${title}-${Date.now()}`,
+        data: { url, icon: icon || '/images/logo/logo-icon.svg' },
+      },
+    });
+  } catch {
+    // push fail hone se app flow na ruke
+  }
+}
+
+/** Naya post/reel/video/story par followers ko notification + push. */
+export async function notifyFollowersOfNewContent(
+  authorId: string,
+  kind: 'new_post' | 'new_reel' | 'new_video' | 'new_story',
+  contentId?: string,
+  caption?: string | null,
+): Promise<void> {
+  try {
+    const { data: followers } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('following_id', authorId)
+      .eq('status', 'accepted');
+    const ids = Array.from(
+      new Set((followers || []).map((f: { follower_id: string }) => f.follower_id).filter(Boolean)),
+    ).filter((id) => id !== authorId);
+    if (ids.length === 0) return;
+
+    const author = await getProfile(authorId);
+    const who = author?.username || 'Someone';
+    const titles: Record<typeof kind, string> = {
+      new_post: `${who} added a new post`,
+      new_reel: `${who} added a new reel`,
+      new_video: `${who} uploaded a new video`,
+      new_story: `${who} added a new story`,
+    };
+    const url =
+      kind === 'new_video'
+        ? contentId ? `/videos/${contentId}` : '/videos'
+        : kind === 'new_reel'
+          ? contentId ? `/reels?r=${contentId}` : '/reels'
+          : kind === 'new_story'
+            ? `/stories?u=${authorId}`
+            : contentId ? `/post/${contentId}` : '/';
+
+    // new_story ki DB row already trigger se banti hai — dohra na ho.
+    if (kind !== 'new_story') {
+      await supabase.from('notifications').insert(
+        ids.map((id) => ({
+          user_id: id,
+          actor_id: authorId,
+          type: kind,
+          post_id: contentId || null,
+          message: caption || null,
+        })),
+      );
+    }
+    await Promise.all(
+      ids.map((id) =>
+        sendPushTo(id, titles[kind], caption || '', url, `${kind}-${contentId || Date.now()}`, author?.avatar_url),
+      ),
+    );
+  } catch {
+    // content publish ho gaya hai — notification fail ho to ignore
+  }
+}
+
+/** "2 min 15 sec" jaisa readable duration. */
+export function formatCallDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const m = Math.floor(s / 60);
+  const rest = s % 60;
+  if (m === 0) return `${rest} sec`;
+  if (rest === 0) return `${m} min`;
+  return `${m} min ${rest} sec`;
+}
+
+/** Call khatam hone par duration DB me save. */
+export async function saveCallLog(input: {
+  callerId: string;
+  receiverId: string;
+  callType: 'audio' | 'video';
+  status: 'answered' | 'missed' | 'declined';
+  durationSec: number;
+  startedAt?: string | null;
+}): Promise<void> {
+  try {
+    await supabase.from('call_logs').insert({
+      caller_id: input.callerId,
+      receiver_id: input.receiverId,
+      call_type: input.callType,
+      status: input.status,
+      duration_sec: Math.max(0, Math.round(input.durationSec)),
+      started_at: input.startedAt || new Date().toISOString(),
+      ended_at: new Date().toISOString(),
+    });
+  } catch {
+    // table missing ho to app na toote
+  }
 }
 
 export async function getUnreadNotificationsCount(userId: string): Promise<number> {
@@ -1033,13 +1166,19 @@ export async function createReel(
         mute_original: music.mute_original,
       }
     : base;
-  const { error } = await supabase.from('reels').insert(withMusic);
-  if (!error) return;
+  const { data: created, error } = await supabase.from('reels').insert(withMusic).select('id').maybeSingle();
+  if (!error) {
+    void notifyFollowersOfNewContent(userId, 'new_reel', created?.id, caption);
+    return;
+  }
   // Agar music columns abhi DB me migrate nahi hui hain, reel bina gaane ke
   // publish ho jaye — upload waste na ho.
   if (music) {
-    const { error: retryError } = await supabase.from('reels').insert(base);
-    if (!retryError) return;
+    const { data: retried, error: retryError } = await supabase.from('reels').insert(base).select('id').maybeSingle();
+    if (!retryError) {
+      void notifyFollowersOfNewContent(userId, 'new_reel', retried?.id, caption);
+      return;
+    }
   }
   throw error;
 }

@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { getProfile, createNotification, sendMessage } from '@/services/api';
+import { getProfile, createNotification, sendMessage, saveCallLog, formatCallDuration, sendPushTo } from '@/services/api';
 import type { Profile } from '@/types/types';
 
 export type CallKind = 'audio' | 'video';
@@ -125,6 +125,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (e) { console.warn('missed push failed', e); }
     createNotification(targetId, 'message', user?.id, undefined, undefined, `📵 Missed ${label} — ${body}`).catch(() => {});
+    if (user?.id) {
+      void saveCallLog({
+        callerId: reason === 'declined' || reason === 'busy' ? targetId : user.id,
+        receiverId: reason === 'declined' || reason === 'busy' ? user.id : targetId,
+        callType: kind === 'video' ? 'video' : 'audio',
+        status: reason === 'declined' ? 'declined' : 'missed',
+        durationSec: 0,
+      });
+    }
   }, [user]);
 
   // Send helper — pushes signaling event to peer's channel
@@ -379,6 +388,21 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const emoji = kind === 'video' ? '🎥' : '📞';
       const text = `${emoji} ${kind === 'video' ? 'Video' : 'Voice'} call · ${mm}:${ss}`;
       sendMessage(peerId, text).catch(() => {});
+      const pretty = formatCallDuration(durSec);
+      const label = kind === 'video' ? 'Video call' : 'Voice call';
+      void saveCallLog({
+        callerId: user.id,
+        receiverId: peerId,
+        callType: kind === 'video' ? 'video' : 'audio',
+        status: 'answered',
+        durationSec: durSec,
+        startedAt: new Date(startedAt).toISOString(),
+      });
+      createNotification(
+        peerId, 'message', user.id, undefined, undefined,
+        `📞 Call ended — ${pretty}`,
+      ).catch(() => {});
+      void sendPushTo(peerId, `${label} ended`, `Call ended — ${pretty}`, `/chat/${user.id}`, `call-ended-${peerId}-${Date.now()}`);
     }
     startedAtRef.current = null;
     cleanup();

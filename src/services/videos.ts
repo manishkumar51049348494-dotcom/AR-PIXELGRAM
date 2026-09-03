@@ -1,4 +1,5 @@
 import { supabase } from '@/db/supabase';
+import { notifyFollowersOfNewContent } from '@/services/api';
 import type { Profile } from '@/types/types';
 import * as tus from 'tus-js-client';
 
@@ -184,7 +185,11 @@ export async function createVideo(input: {
     .select('*')
     .single();
   if (error) throw error;
-  return data as AppVideo;
+  const video = data as AppVideo;
+  if (video.visibility === 'public') {
+    void notifyFollowersOfNewContent(input.userId, 'new_video', video.id, video.title);
+  }
+  return video;
 }
 
 export async function getVideosFeed(limit = 24, offset = 0): Promise<AppVideo[]> {
