@@ -97,7 +97,7 @@ function humanUploadError(err: unknown): string {
   const raw = `${anyErr?.message || ''} ${body}`.toLowerCase();
 
   if (status === 413 || raw.includes('exceeded the maximum allowed size') || raw.includes('payload too large')) {
-    return 'Video bahut bada hai — chhota video ya kam quality wala select karein';
+    return 'Video storage limit se bada hai (free plan par ~50MB/file) — chhota ya kam quality wala video select karein, ya Supabase Dashboard → Settings → Storage me file size limit badhayein';
   }
   if (status === 401 || status === 403 || raw.includes('unauthorized') || raw.includes('row-level security')) {
     return 'Login session expire ho gaya — dobara login karke try karein';
@@ -189,7 +189,9 @@ export async function uploadVideoFile(
   const publicUrl = () => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
   // Chhote videos: seedha upload (fast + sabse reliable).
-  const DIRECT_LIMIT = 45 * 1024 * 1024;
+  // Bade videos (10 min tak) seedha resumable TUS chunks se — direct request
+  // ek hi baar me poora body bhejti hai jisme proxy/timeouts fail kar sakte hain.
+  const DIRECT_LIMIT = 20 * 1024 * 1024;
   if (file.size <= DIRECT_LIMIT) {
     onProgress?.(5);
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
