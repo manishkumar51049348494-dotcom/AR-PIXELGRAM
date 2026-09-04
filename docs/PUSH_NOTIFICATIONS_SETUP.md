@@ -8,18 +8,18 @@ Ye keys kahin set nahi thi — isliye ab tak koi push nahi aa raha tha.
 Supabase project ke Edge Function secrets me ye 3 values daalein:
 
 ```
-VAPID_PUBLIC_KEY  = BFtDs7LO2x5lNLDAS_FCW2m3zg1FzZuk2QJn7sZh6Bkjd7CWLyvHYK2ic6G3Fo-dnazsv5A5lQ8zx7E3bU5ORBs
-VAPID_PRIVATE_KEY = YFke2tTBk4GwJRaHRp-W4C0gKodVmiX8WEoHrN7kzNY
-VAPID_SUBJECT     = mailto:noreply@arpixelgram.app
+VAPID_PUBLIC_KEY  = BPI33qsZ2hvJ-JVhPj1CZirnTLURQpiK1GDG4OZCSYAhy4-Khdw2I1hkv90hPsE7VACQJjDfBf9X_h3Pwri7qpA
+VAPID_PRIVATE_KEY = <PRIVATE_KEY — chat/password manager se lein, repo me na rakhein>
+VAPID_SUBJECT     = mailto:arpixelgram@gmail.com
 ```
 
 CLI se:
 
 ```bash
 supabase secrets set \
-  VAPID_PUBLIC_KEY=BFtDs7LO2x5lNLDAS_FCW2m3zg1FzZuk2QJn7sZh6Bkjd7CWLyvHYK2ic6G3Fo-dnazsv5A5lQ8zx7E3bU5ORBs \
-  VAPID_PRIVATE_KEY=YFke2tTBk4GwJRaHRp-W4C0gKodVmiX8WEoHrN7kzNY \
-  VAPID_SUBJECT=mailto:noreply@arpixelgram.app
+  VAPID_PUBLIC_KEY=BPI33qsZ2hvJ-JVhPj1CZirnTLURQpiK1GDG4OZCSYAhy4-Khdw2I1hkv90hPsE7VACQJjDfBf9X_h3Pwri7qpA \
+  VAPID_PRIVATE_KEY=<PRIVATE_KEY — chat/password manager se lein, repo me na rakhein> \
+  VAPID_SUBJECT=mailto:arpixelgram@gmail.com
 supabase functions deploy send-call-push
 ```
 
@@ -31,7 +31,7 @@ supabase functions deploy send-call-push
 `.env` (aur hosting ke env settings) me:
 
 ```
-VITE_VAPID_PUBLIC_KEY=BFtDs7LO2x5lNLDAS_FCW2m3zg1FzZuk2QJn7sZh6Bkjd7CWLyvHYK2ic6G3Fo-dnazsv5A5lQ8zx7E3bU5ORBs
+VITE_VAPID_PUBLIC_KEY=BPI33qsZ2hvJ-JVhPj1CZirnTLURQpiK1GDG4OZCSYAhy4-Khdw2I1hkv90hPsE7VACQJjDfBf9X_h3Pwri7qpA
 ```
 
 Iske bina browser subscription nahi banega (`usePushSubscription` skip kar deta hai).
