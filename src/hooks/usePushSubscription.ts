@@ -80,13 +80,14 @@ export function usePushSubscription(userId: string | undefined) {
         const auth = json.keys?.auth;
         if (!json.endpoint || !p256dh || !auth) return;
 
-        await supabase.from('push_subscriptions').upsert({
+        const { error: saveError } = await supabase.from('push_subscriptions').upsert({
           user_id: userId,
           endpoint: json.endpoint,
           p256dh,
           auth,
           user_agent: navigator.userAgent,
         }, { onConflict: 'user_id,endpoint' });
+        if (saveError) console.error('push subscription save failed', saveError);
       } catch (e) {
         console.warn('push subscribe failed', e);
       }
