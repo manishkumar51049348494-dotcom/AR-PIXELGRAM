@@ -11,9 +11,9 @@ import {
   ArrowLeft, Loader2, Eye, EyeOff, Camera, Mail, Phone, Check, User as UserIcon,
 } from 'lucide-react';
 
-type Step = 'name' | 'username' | 'dob' | 'contact' | 'password' | 'photo' | 'terms' | 'welcome';
+type Step = 'name' | 'username' | 'dob' | 'contact' | 'password' | 'photo' | 'terms' | 'code' | 'welcome';
 
-const STEPS: Step[] = ['name', 'username', 'dob', 'contact', 'password', 'photo', 'terms'];
+const BASE_STEPS: Step[] = ['name', 'username', 'dob', 'contact', 'password', 'photo', 'terms'];
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -35,8 +35,12 @@ const RegisterPage: React.FC = () => {
   const [rawPhoto, setRawPhoto] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [otp, setOtp] = useState('');
+  const [resending, setResending] = useState(false);
 
   const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+  // Mobile number wale signup me terms ke baad SMS code verify hota hai.
+  const STEPS: Step[] = contactType === 'phone' ? [...BASE_STEPS, 'code'] : BASE_STEPS;
   const stepIndex = STEPS.indexOf(step);
 
   const goBack = () => {
@@ -109,15 +113,97 @@ const RegisterPage: React.FC = () => {
   };
 
   // ---- account creation --------------------------------------------------
-  const authEmail = contactType === 'email'
-    ? email.trim().toLowerCase()
-    : `${phone.replace(/[^\d]/g, '')}@phone.arpixelgram.app`;
+  const e164Phone = (() => {
+    const digits = phone.replace(/[^\d+]/g, '');
+    return digits.startsWith('+') ? digits : `+${digits}`;
+  })();
+
+  const finishProfile = async (userId: string) => {
+    let avatarUrl: string | undefined;
+    if (photoFile) {
+      try {
+        avatarUrl = await uploadImage('avatars', photoFile, userId);
+      } catch {
+        toast.error('Photo upload nahi ho paayi — baad me Edit Profile se laga sakte hain');
+      }
+    }
+    try {
+      await updateProfile(userId, {
+        full_name: fullName,
+        dob: dob || null,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+      });
+    } catch {
+      /* profile trigger thoda late ho sakta hai — login ke baad bhi set ho jayega */
+    }
+  };
+
+  // Number wale signup me SMS par 6-digit code bhejte hain.
+  const sendPhoneOtp = async (isResend = false) => {
+    const { data, error } = await supabase.functions.invoke('signup-phone-start', {
+      body: { phone: e164Phone },
+    });
+    if (error || data?.error) {
+      toast.error(data?.error || 'Code bhejne me dikkat aayi. Dobara try karein.');
+      return false;
+    }
+    toast.success(isResend ? 'Naya code bhej diya gaya' : `Code bhej diya gaya ${e164Phone} par`);
+    return true;
+  };
+
+  const resendPhoneOtp = async () => {
+    setResending(true);
+    try { await sendPhoneOtp(true); } finally { setResending(false); }
+  };
+
+  const verifyPhoneAndCreate = async () => {
+    if (!/^\d{6}$/.test(otp.trim())) { toast.error('SMS me aaya 6-digit code daalein'); return; }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('signup-phone-confirm', {
+        body: {
+          phone: e164Phone,
+          code: otp.trim(),
+          password,
+          username,
+          full_name: fullName,
+        },
+      });
+      if (error || data?.error || !data?.ok) {
+        toast.error(data?.error || 'Code verify nahi hua. Dobara try karein.');
+        return;
+      }
+      if (data.access_token && data.refresh_token) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
+        if (!sessionError) {
+          if (data.user_id) await finishProfile(data.user_id);
+          setStep('welcome');
+          setTimeout(() => navigate('/home'), 2000);
+          return;
+        }
+      }
+      toast.success('Account ban gaya! Ab apne number se log in karein.');
+      navigate('/login');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const createAccount = async () => {
     setLoading(true);
     try {
+      // Number wala signup: pehle SMS code, phir account.
+      if (contactType === 'phone') {
+        const sent = await sendPhoneOtp();
+        if (sent) { setOtp(''); setStep('code'); }
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
-        email: authEmail,
+        email: email.trim().toLowerCase(),
         password,
         options: { data: { username, full_name: fullName } },
       });
@@ -130,25 +216,7 @@ const RegisterPage: React.FC = () => {
         return;
       }
 
-      if (userId) {
-        let avatarUrl: string | undefined;
-        if (photoFile) {
-          try {
-            avatarUrl = await uploadImage('avatars', photoFile, userId);
-          } catch {
-            toast.error('Photo upload nahi ho paayi — baad me Edit Profile se laga sakte hain');
-          }
-        }
-        try {
-          await updateProfile(userId, {
-            full_name: fullName,
-            dob: dob || null,
-            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-          });
-        } catch {
-          /* profile trigger thoda late ho sakta hai — login ke baad bhi set ho jayega */
-        }
-      }
+      if (userId) await finishProfile(userId);
 
       setStep('welcome');
       setTimeout(() => navigate('/home'), 2000);
@@ -387,6 +455,38 @@ const RegisterPage: React.FC = () => {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-2" /> I Agree</>}
               </Button>
             </div>
+          )}
+
+          {step === 'code' && (
+            <form onSubmit={e => { e.preventDefault(); void verifyPhoneAndCreate(); }} className="space-y-5">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold text-foreground">Enter the code</h1>
+                <p className="text-sm text-muted-foreground">
+                  Humne <span className="text-foreground font-medium">{e164Phone}</span> par 6-digit code SMS kiya hai.
+                </p>
+              </div>
+              <Input
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                maxLength={6}
+                className="h-14 text-center text-2xl tracking-[0.5em] font-semibold"
+                autoFocus
+              />
+              <Button type="submit" className="w-full h-12 font-semibold" disabled={loading || otp.length !== 6}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & create account'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => void resendPhoneOtp()}
+                disabled={resending || loading}
+                className="w-full text-sm text-primary font-medium py-1 disabled:opacity-50"
+              >
+                {resending ? 'Bhej rahe hain…' : 'Code dobara bhejein'}
+              </button>
+            </form>
           )}
 
           <p className="text-center text-sm text-muted-foreground">

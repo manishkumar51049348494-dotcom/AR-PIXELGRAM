@@ -72,12 +72,17 @@ Deno.serve(async (req) => {
       if (profile?.user_id) ownerId = profile.user_id;
     }
 
+    // Phone-only accounts (jinme email hai hi nahi) ke liye phone se login karte hain.
+    let phoneLogin: string | null = null;
     if (!email && ownerId) {
       const { data: userData } = await admin.auth.admin.getUserById(ownerId);
       email = userData?.user?.email ?? null;
+      if (!email) phoneLogin = userData?.user?.phone
+        ? (userData.user.phone.startsWith('+') ? userData.user.phone : `+${userData.user.phone}`)
+        : null;
     }
 
-    if (!email) {
+    if (!email && !phoneLogin) {
       return new Response(JSON.stringify({ error: GENERIC_ERROR }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -88,7 +93,7 @@ Deno.serve(async (req) => {
     const tokenRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(email ? { email, password } : { phone: phoneLogin, password }),
     });
     const tokenJson = await tokenRes.json();
     if (!tokenRes.ok) {
