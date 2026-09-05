@@ -366,7 +366,19 @@ export async function getFollowingCount(userId: string): Promise<number> {
 
 // ===================== MESSAGES =====================
 export async function sendMessage(receiverId: string, content: string): Promise<void> {
-  await supabase.from('messages').insert({ receiver_id: receiverId, content });
+  const { error } = await supabase.from('messages').insert({ receiver_id: receiverId, content });
+  if (error) throw error;
+
+  // Receiver ko notification + phone push (app band ho tab bhi).
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    const senderId = auth?.user?.id;
+    if (!senderId || senderId === receiverId) return;
+    const preview = content.length > 80 ? `${content.slice(0, 80)}...` : content;
+    await createNotification(receiverId, 'message', senderId, undefined, undefined, preview);
+  } catch (e) {
+    console.warn('message notification failed', e);
+  }
 }
 
 export async function getMessages(userAId: string, userBId: string): Promise<Message[]> {
