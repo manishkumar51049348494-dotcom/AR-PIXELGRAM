@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layouts/MobileLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMyVerificationRequest, submitVerificationRequest, submitProblemReport } from '@/services/api';
+import { getMyVerificationRequest, submitVerificationRequest } from '@/services/api';
 import type { VerificationRequest } from '@/types/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, KeyRound, AtSign, Globe } from 'lucide-react';
+import { Moon, Sun, HelpCircle, Flag, Shield, LogOut, Trash2, BadgeCheck, ChevronRight, ArrowLeft, Loader2, LayoutDashboard, AtSign, Globe } from 'lucide-react';
+import ReportProblemSection from './ReportProblemSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
@@ -21,8 +21,6 @@ const SettingsPage: React.FC = () => {
   const [section, setSection] = useState<'main' | 'help' | 'report' | 'verification'>('main');
   const [verificationRequest, setVerificationRequest] = useState<VerificationRequest | null>(null);
   const [verifyReason, setVerifyReason] = useState('');
-  const [reportType, setReportType] = useState<string>('bug');
-  const [reportDesc, setReportDesc] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -59,17 +57,6 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSubmitReport = async () => {
-    if (!reportDesc.trim()) { toast.error('समस्या का विवरण लिखें'); return; }
-    if (!user) return;
-    setLoading(true);
-    await submitProblemReport(user.id, reportType, reportDesc.trim());
-    toast.success('Report submit हुई। धन्यवाद! 🙏');
-    setReportDesc('');
-    setSection('main');
-    setLoading(false);
-  };
-
   if (section === 'help') {
     return (
       <MobileLayout hideNav>
@@ -81,7 +68,7 @@ const SettingsPage: React.FC = () => {
           <div className="space-y-4">
             {[
               { q: 'Email ya phone number kaise add karein?', a: 'Settings → Account Center me jaakar email ya number daalein, OTP verify karein. Max 5 email aur 5 number. Verified email/number se wahi password daal kar login bhi ho jayega.' },
-              { q: 'How to change my password?', a: 'Go to Settings → Account → Change Password. You\'ll receive a reset email.' },
+              { q: 'Password bhool gaye?', a: 'Login screen par "Forgot password" par tap karein aur OTP se naya password set karein.' },
               { q: 'How to make my account private?', a: 'Go to Edit Profile and toggle "Private Account". Only approved followers can see your posts.' },
               { q: 'How to get verified?', a: 'Submit a verification request with a valid reason. Our team reviews within 3-5 business days.' },
               { q: 'How to delete my account?', a: 'Scroll to the bottom of Settings and tap "Delete Account". This action is permanent.' },
@@ -101,41 +88,11 @@ const SettingsPage: React.FC = () => {
   if (section === 'report') {
     return (
       <MobileLayout hideNav>
-        <div className="p-4 page-transition">
-          <button onClick={() => setSection('main')} className="flex items-center gap-2 mb-5 text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-5 h-5" /><span className="text-sm font-medium">Back</span>
-          </button>
-          <h2 className="text-xl font-bold text-foreground mb-5">Report a Problem</h2>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bug">Bug / Technical Issue</SelectItem>
-                  <SelectItem value="post">Inappropriate Post</SelectItem>
-                  <SelectItem value="user">Suspicious User</SelectItem>
-                  <SelectItem value="story">Inappropriate Story</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>समस्या का विवरण</Label>
-              <Textarea
-                placeholder="समस्या विस्तार से बताएं…"
-                value={reportDesc}
-                onChange={e => setReportDesc(e.target.value)}
-                rows={5}
-                maxLength={500}
-                className="resize-none"
-              />
-              <p className="text-xs text-muted-foreground text-right">{reportDesc.length}/500</p>
-            </div>
-            <Button className="w-full h-11 font-semibold" onClick={handleSubmitReport} disabled={loading || !reportDesc.trim()}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}Submit Report
-            </Button>
-          </div>
-        </div>
+        <ReportProblemSection
+          userId={user?.id || ''}
+          onBack={() => setSection('main')}
+          onDone={() => setSection('main')}
+        />
       </MobileLayout>
     );
   }
@@ -222,7 +179,6 @@ const SettingsPage: React.FC = () => {
           )}
           <div className="flex-1 min-w-0">
             <p className="font-bold text-foreground truncate">{profile?.username}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
           {profile?.is_verified && <BadgeCheck className="w-5 h-5 text-primary shrink-0" />}
         </div>
@@ -243,7 +199,6 @@ const SettingsPage: React.FC = () => {
 
         {/* Menu items */}
         {[
-          { icon: KeyRound, label: 'Change Password', desc: 'OTP se apna password reset karo', onClick: () => navigate('/forgot-password'), danger: false },
           { icon: BadgeCheck, label: 'Request Verification', desc: profile?.is_verified ? 'Already verified ✓' : 'Get the blue badge', onClick: () => setSection('verification'), danger: false },
           { icon: AtSign, label: 'Account Center', desc: 'Email aur phone number add/manage karein', onClick: () => navigate('/settings/account-center'), danger: false },
           { icon: Globe, label: 'Language', desc: 'App ki bhasha chunein / Select your language', onClick: () => navigate('/settings/language'), danger: false },
