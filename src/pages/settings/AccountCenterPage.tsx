@@ -5,7 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { ArrowLeft, Mail, Phone, Loader2, Plus, Trash2, ShieldCheck } from 'lucide-react';
+import {
+  ArrowLeft,
+  AtSign,
+  ChevronRight,
+  KeyRound,
+  Loader2,
+  Mail,
+  Phone,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+} from 'lucide-react';
 import {
   listMyIdentifiers,
   sendIdentifierOtp,
@@ -17,17 +29,14 @@ import {
 } from '@/services/accountCenter';
 import PasswordResetSection from '@/components/settings/PasswordResetSection';
 
-/**
- * Account Center — Facebook jaisa: ek hi account me kai email aur phone number
- * add kiye ja sakte hain (max 5 + 5). Har naya email/number pehle OTP se verify
- * hota hai, uske baad usi password ke saath us email/number se login bhi ho jata hai.
- */
+type View = 'home' | 'personal' | 'contact' | 'password';
+
 const AccountCenterPage: React.FC = () => {
   const navigate = useNavigate();
+  const [view, setView] = useState<View>('home');
+  const [addingType, setAddingType] = useState<IdentifierType | null>(null);
   const [items, setItems] = useState<AccountIdentifier[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Add flow state (email aur phone ke liye alag-alag).
   const [draft, setDraft] = useState<Record<IdentifierType, string>>({ email: '', phone: '' });
   const [pending, setPending] = useState<Record<IdentifierType, string | null>>({ email: null, phone: null });
   const [otp, setOtp] = useState<Record<IdentifierType, string>>({ email: '', phone: '' });
@@ -36,9 +45,9 @@ const AccountCenterPage: React.FC = () => {
   const load = useCallback(async () => {
     try {
       setItems(await listMyIdentifiers());
-    } catch (e) {
-      console.error(e);
-      toast.error('List load nahi ho paayi. Internet check karein.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Details load nahi ho paayi. Internet check karein.');
     } finally {
       setLoading(false);
     }
@@ -46,20 +55,33 @@ const AccountCenterPage: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const emails = items.filter(i => i.type === 'email');
-  const phones = items.filter(i => i.type === 'phone');
+  const emails = items.filter(item => item.type === 'email');
+  const phones = items.filter(item => item.type === 'phone');
+
+  const goBack = () => {
+    if (addingType) {
+      setAddingType(null);
+      return;
+    }
+    if (view === 'contact') setView('personal');
+    else if (view === 'personal' || view === 'password') setView('home');
+    else navigate('/settings');
+  };
 
   const handleSendOtp = async (type: IdentifierType) => {
     const value = draft[type].trim();
-    if (!value) { toast.error(type === 'email' ? 'Email daalein' : 'Number daalein'); return; }
+    if (!value) {
+      toast.error(type === 'email' ? 'Email address daalein' : 'Mobile number daalein');
+      return;
+    }
     setBusy(type);
     try {
       await sendIdentifierOtp(type, value);
-      setPending(p => ({ ...p, [type]: value }));
-      setOtp(o => ({ ...o, [type]: '' }));
-      toast.success(type === 'email' ? 'OTP email par bhej diya' : 'OTP number par bhej diya');
-    } catch (e) {
-      toast.error((e as Error).message);
+      setPending(current => ({ ...current, [type]: value }));
+      setOtp(current => ({ ...current, [type]: '' }));
+      toast.success(type === 'email' ? 'Email par code bhej diya' : 'Number par code bhej diya');
+    } catch (error) {
+      toast.error((error as Error).message);
     } finally {
       setBusy(null);
     }
@@ -69,150 +91,229 @@ const AccountCenterPage: React.FC = () => {
     const value = pending[type];
     const code = otp[type].trim();
     if (!value) return;
-    if (code.length < 4) { toast.error('OTP daalein'); return; }
+    if (code.length < 4) {
+      toast.error('Verification code daalein');
+      return;
+    }
     setBusy(type);
     try {
       await confirmIdentifierOtp(type, value, code);
-      toast.success(type === 'email' ? 'Email add ho gaya ✅' : 'Number add ho gaya ✅');
-      setPending(p => ({ ...p, [type]: null }));
-      setDraft(d => ({ ...d, [type]: '' }));
-      setOtp(o => ({ ...o, [type]: '' }));
+      toast.success(type === 'email' ? 'Email add ho gaya' : 'Mobile number add ho gaya');
+      setPending(current => ({ ...current, [type]: null }));
+      setDraft(current => ({ ...current, [type]: '' }));
+      setOtp(current => ({ ...current, [type]: '' }));
+      setAddingType(null);
       await load();
-    } catch (e) {
-      toast.error((e as Error).message);
+    } catch (error) {
+      toast.error((error as Error).message);
     } finally {
       setBusy(null);
     }
   };
 
   const handleRemove = async (item: AccountIdentifier) => {
+    const label = item.type === 'email' ? 'email' : 'number';
+    if (!window.confirm(`Kya aap ye ${label} hatana chahte hain?`)) return;
     try {
       await removeIdentifier(item.id);
-      toast.success('Hata diya');
+      toast.success(`${item.type === 'email' ? 'Email' : 'Number'} hata diya`);
       await load();
     } catch {
       toast.error('Hataya nahi ja saka');
     }
   };
 
-  const renderSection = (type: IdentifierType) => {
-    const list = type === 'email' ? emails : phones;
-    const Icon = type === 'email' ? Mail : Phone;
-    const full = list.length >= MAX_PER_TYPE;
+  const title = addingType
+    ? addingType === 'email' ? 'Email address add karein' : 'Mobile number add karein'
+    : view === 'personal' ? 'Personal details'
+    : view === 'contact' ? 'Contact info'
+    : view === 'password' ? 'Password and security'
+    : 'Accounts Center';
+
+  const renderAddForm = (type: IdentifierType) => {
+    const full = (type === 'email' ? emails : phones).length >= MAX_PER_TYPE;
     const waiting = pending[type];
 
     return (
-      <div className="glass-card rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Icon className="w-5 h-5 text-primary" />
-          <p className="font-semibold text-foreground">
-            {type === 'email' ? 'Email addresses' : 'Phone numbers'}
+      <div className="space-y-5 px-4 pt-5">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">{title}</h2>
+          <p className="mt-2 text-sm leading-5 text-muted-foreground">
+            {type === 'email'
+              ? 'Aisa email daalein jiska access aapke paas hai. Ye aapki public profile par nahi dikhega.'
+              : 'Country code ke saath number daalein. Ye aapki public profile par nahi dikhega.'}
           </p>
-          <span className="ml-auto text-xs text-muted-foreground">{list.length}/{MAX_PER_TYPE}</span>
-        </div>
-
-        <div className="space-y-2">
-          {list.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              {type === 'email' ? 'Koi email add nahi hai.' : 'Koi number add nahi hai.'}
-            </p>
-          )}
-          {list.map(item => (
-            <div key={item.id} className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
-              <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
-              <span className="text-sm text-foreground truncate flex-1">{item.value}</span>
-              {item.is_primary ? (
-                <span className="text-[10px] uppercase tracking-wide text-primary font-semibold shrink-0">Primary</span>
-              ) : (
-                <button onClick={() => handleRemove(item)} className="text-destructive shrink-0" aria-label="Remove">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
         </div>
 
         {full ? (
-          <p className="text-xs text-muted-foreground">
-            Limit poori — ek account me max {MAX_PER_TYPE} {type === 'email' ? 'email' : 'number'} add ho sakte hain.
+          <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+            Aap maximum {MAX_PER_TYPE} {type === 'email' ? 'email addresses' : 'mobile numbers'} add kar sakte hain.
           </p>
         ) : waiting ? (
-          <div className="space-y-2">
-            <Label>{waiting} par bheja gaya OTP daalein</Label>
-            <Input
-              inputMode="numeric"
-              placeholder="6-digit OTP"
-              maxLength={6}
-              value={otp[type]}
-              onChange={e => setOtp(o => ({ ...o, [type]: e.target.value.replace(/\D/g, '') }))}
-              className="h-11 tracking-[0.4em] text-center"
-            />
-            <div className="flex gap-2">
-              <Button className="flex-1 h-11 font-semibold" onClick={() => handleConfirm(type)} disabled={busy === type}>
-                {busy === type ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Confirm & Add
-              </Button>
-              <Button variant="outline" className="h-11" onClick={() => handleSendOtp(type)} disabled={busy === type}>
-                Resend
-              </Button>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor={`otp-${type}`}>Verification code</Label>
+              <p className="mb-2 mt-1 text-xs text-muted-foreground">{waiting} par bheja gaya 6-digit code daalein.</p>
+              <Input
+                id={`otp-${type}`}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                maxLength={6}
+                value={otp[type]}
+                onChange={event => setOtp(current => ({ ...current, [type]: event.target.value.replace(/\D/g, '') }))}
+                className="h-12 text-center text-lg tracking-[0.35em]"
+              />
             </div>
-            <button
-              className="text-xs text-muted-foreground underline"
-              onClick={() => setPending(p => ({ ...p, [type]: null }))}
-            >
-              Cancel
-            </button>
+            <Button className="h-11 w-full font-semibold" onClick={() => handleConfirm(type)} disabled={busy === type}>
+              {busy === type && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Continue
+            </Button>
+            <Button variant="ghost" className="h-10 w-full" onClick={() => handleSendOtp(type)} disabled={busy === type}>
+              Code dobara bhejein
+            </Button>
           </div>
         ) : (
-          <div className="space-y-2">
-            <Label htmlFor={`add-${type}`}>
-              {type === 'email' ? 'Naya email add karein' : 'Naya number add karein (kisi bhi desh ka)'}
-            </Label>
-            <div className="flex gap-2">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor={`add-${type}`}>{type === 'email' ? 'Email address' : 'Mobile number'}</Label>
               <Input
                 id={`add-${type}`}
                 type={type === 'email' ? 'email' : 'tel'}
-                placeholder={type === 'email' ? 'you@example.com' : '+91 98765 43210'}
+                autoComplete={type === 'email' ? 'email' : 'tel'}
+                placeholder={type === 'email' ? 'name@example.com' : '+91 98765 43210'}
                 value={draft[type]}
-                onChange={e => setDraft(d => ({ ...d, [type]: e.target.value }))}
-                className="h-11"
+                onChange={event => setDraft(current => ({ ...current, [type]: event.target.value }))}
+                className="mt-2 h-12"
               />
-              <Button className="h-11 shrink-0" onClick={() => handleSendOtp(type)} disabled={busy === type}>
-                {busy === type ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                <span className="ml-1">OTP</span>
-              </Button>
             </div>
-            {type === 'phone' && (
-              <p className="text-xs text-muted-foreground">Country code zaroori hai, jaise +91, +1, +971.</p>
-            )}
+            <Button className="h-11 w-full font-semibold" onClick={() => handleSendOtp(type)} disabled={busy === type}>
+              {busy === type && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Continue
+            </Button>
           </div>
         )}
       </div>
     );
   };
 
+  const renderContactInfo = () => (
+    <div className="space-y-5 px-4 pt-5">
+      <div>
+        <h2 className="text-xl font-bold text-foreground">Contact info</h2>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">
+          Apne account par email addresses aur mobile numbers manage karein. Ye details public profile par nahi dikhengi.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          {items.length === 0 ? (
+            <p className="px-4 py-5 text-sm text-muted-foreground">Abhi koi contact detail add nahi hai.</p>
+          ) : items.map((item, index) => {
+            const Icon = item.type === 'email' ? Mail : Phone;
+            return (
+              <div key={item.id} className={`flex min-h-16 items-center gap-3 px-4 py-3 ${index ? 'border-t border-border' : ''}`}>
+                <Icon className="h-5 w-5 shrink-0 text-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{item.value}</p>
+                  <p className="text-xs text-muted-foreground">{item.is_primary ? 'Primary' : 'Verified'}</p>
+                </div>
+                {item.is_primary ? (
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-label="Primary contact" />
+                ) : (
+                  <Button variant="ghost" size="icon" onClick={() => handleRemove(item)} aria-label="Remove contact">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setAddingType('email')}
+            className="flex min-h-14 w-full items-center gap-3 border-t border-border px-4 text-left text-sm font-semibold text-primary"
+          >
+            <Plus className="h-5 w-5" /> Add email address
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddingType('phone')}
+            className="flex min-h-14 w-full items-center gap-3 border-t border-border px-4 text-left text-sm font-semibold text-primary"
+          >
+            <Plus className="h-5 w-5" /> Add mobile number
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <MobileLayout hideNav>
-      <div className="p-4 page-transition space-y-4">
-        <button onClick={() => navigate('/settings')} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-5 h-5" /><span className="text-sm font-medium">Back</span>
-        </button>
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Account Center</h2>
-          <p className="text-sm text-muted-foreground text-pretty">
-            Apne account me email aur phone number add karein. Verify hone ke baad
-            unme se kisi se bhi, wahi password daal kar login kar sakte hain.
-          </p>
-        </div>
+      <div className="min-h-screen bg-background pb-8 page-transition">
+        <header className="sticky top-0 z-20 flex h-14 items-center border-b border-border bg-background/95 px-2 backdrop-blur">
+          <Button variant="ghost" size="icon" onClick={goBack} aria-label="Go back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="ml-2 text-base font-bold text-foreground">{title}</h1>
+        </header>
 
-        {loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+        {addingType ? renderAddForm(addingType) : view === 'contact' ? renderContactInfo() : view === 'password' ? (
+          <div className="px-4 pt-5"><PasswordResetSection /></div>
+        ) : view === 'personal' ? (
+          <div className="space-y-5 px-4 pt-5">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Personal details</h2>
+              <p className="mt-2 text-sm leading-5 text-muted-foreground">Aapki contact details aur account ownership ki information.</p>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <button type="button" onClick={() => setView('contact')} className="flex min-h-16 w-full items-center gap-3 px-4 text-left">
+                <AtSign className="h-5 w-5 text-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-foreground">Contact info</p>
+                  <p className="text-xs text-muted-foreground">Email addresses and mobile numbers</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
         ) : (
-          <>
-            {renderSection('email')}
-            {renderSection('phone')}
-            <PasswordResetSection />
-          </>
+          <div className="space-y-6 px-4 pt-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
+                <UserRound className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Accounts Center</h2>
+                <p className="text-sm text-muted-foreground">Account settings ek jagah manage karein</p>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <button type="button" onClick={() => setView('personal')} className="flex min-h-[72px] w-full items-center gap-3 px-4 text-left">
+                <UserRound className="h-5 w-5 text-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Personal details</p>
+                  <p className="text-xs text-muted-foreground">Contact info aur account ownership</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </button>
+              <button type="button" onClick={() => setView('password')} className="flex min-h-[72px] w-full items-center gap-3 border-t border-border px-4 text-left">
+                <KeyRound className="h-5 w-5 text-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Password and security</p>
+                  <p className="text-xs text-muted-foreground">Apna password badlein</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            <p className="px-1 text-xs leading-5 text-muted-foreground">
+              Aapki email aur mobile number private hain. Ye kisi aur ko aapki profile par nahi dikhaye jayenge.
+            </p>
+          </div>
         )}
       </div>
     </MobileLayout>
