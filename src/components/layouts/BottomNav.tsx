@@ -4,7 +4,7 @@ import { Home, Video, BookOpen, MessageCircle, User, Globe } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
-const BottomNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) => {
+const BottomNav: React.FC<{ overlay?: boolean; hidden?: boolean }> = ({ overlay = false, hidden = false }) => {
   const location = useLocation();
   const { t } = useLanguage();
   const navItems = [
@@ -18,7 +18,8 @@ const BottomNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) => {
   return (
     <nav
       className={cn(
-        'fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 safe-bottom',
+        'fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 safe-bottom transition-transform duration-300',
+        hidden && 'translate-y-full',
         overlay
           ? 'bg-gradient-to-t from-black/85 via-black/60 to-transparent pt-3'
           : 'bottom-nav'
