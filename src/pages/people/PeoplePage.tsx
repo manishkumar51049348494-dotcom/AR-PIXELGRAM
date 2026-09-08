@@ -69,7 +69,7 @@ const PeoplePage: React.FC = () => {
   };
 
   return (
-    <MobileLayout>
+    <MobileLayout autoHideNav>
       <div className="page-transition">
         <div className="px-4 pt-4 pb-3 border-b border-border">
           <h2 className="text-xl font-bold text-foreground mb-3">लोग खोजें</h2>
