@@ -258,7 +258,7 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <MobileLayout>
+    <MobileLayout hideHeader autoHideNav>
       <PullToRefresh onRefresh={load}>
       <div className="page-transition">
         {/* Suspended/Locked banner for other users' profiles */}
