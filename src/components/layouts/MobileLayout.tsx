@@ -14,24 +14,33 @@ interface MobileLayoutProps {
   fullscreen?: boolean; // header + nav दोनों छिपाओ, pure black bg (reels के लिए)
 }
 
-const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, hideHeader = false, autoHideNav = false, fullscreen = false }) => {
+const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, hideHeader = false, autoHideNav = true, fullscreen = false }) => {
   const location = useLocation();
   const [navHidden, setNavHidden] = useState(false);
   const lastScrollY = useRef(0);
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!autoHideNav) return;
+    const scrollArea = mainRef.current;
+    if (!autoHideNav || hideNav || !scrollArea) {
+      setNavHidden(false);
+      return;
+    }
     const onScroll = () => {
-      const y = window.scrollY;
+      const y = Math.max(scrollArea.scrollTop, window.scrollY);
       const delta = y - lastScrollY.current;
       if (y <= 40) setNavHidden(false);
       else if (delta > 6) setNavHidden(true);
       else if (delta < -6) setNavHidden(false);
       lastScrollY.current = y;
     };
+    scrollArea.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [autoHideNav]);
+    return () => {
+      scrollArea.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, [autoHideNav, hideNav]);
   const { profile, user } = useAuth();
   const { t } = useLanguage();
   const unreadNotifications = useUnreadNotifications(user?.id);
@@ -78,7 +87,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
       )}
 
       {/* Main Content */}
-      <main className={cn('flex-1 overflow-y-auto', !hideNav && 'pb-nav')}>
+      <main ref={mainRef} className={cn('flex-1 overflow-y-auto', !hideNav && 'pb-nav')}>
         {children}
       </main>
 
