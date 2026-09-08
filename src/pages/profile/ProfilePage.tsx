@@ -133,7 +133,7 @@ const ProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <MobileLayout>
+      <MobileLayout hideNav>
         <div className="px-4 py-4 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-20 h-20 rounded-full bg-muted animate-pulse shrink-0" />
@@ -159,7 +159,7 @@ const ProfilePage: React.FC = () => {
   // isliye owner ko bhi "deleted" ki jagah retry screen dikhao.
   if (!profile && (loadError || isOwnProfile)) {
     return (
-      <MobileLayout>
+      <MobileLayout hideNav>
         <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-6">
           <div className="w-20 h-20 rounded-full border-2 border-border flex items-center justify-center mb-4 bg-muted">
             <Loader2 className="w-8 h-8 text-muted-foreground" />
@@ -179,7 +179,7 @@ const ProfilePage: React.FC = () => {
   // permanently_disabled accounts → "User Not Found" (Instagram-style) + sign-out option
   if (!profile || profile.account_status === 'permanently_disabled') {
     return (
-      <MobileLayout>
+      <MobileLayout hideNav>
         <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-6">
           <div className="w-20 h-20 rounded-full border-2 border-border flex items-center justify-center mb-4 bg-muted">
             <Lock className="w-8 h-8 text-muted-foreground" />
@@ -258,7 +258,7 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <MobileLayout hideHeader autoHideNav>
+    <MobileLayout hideHeader hideNav>
       <PullToRefresh onRefresh={load}>
       <div className="page-transition">
         {/* Suspended/Locked banner for other users' profiles */}
