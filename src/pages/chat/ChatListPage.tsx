@@ -5,8 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/withTimeout';
 import { getMutualFollows, getMessages, getUnreadCount, getMessagedProfiles } from '@/services/api';
 import type { Profile, Message } from '@/types/types';
-import { Link } from 'react-router-dom';
-import { MessageCircle, Loader2, BadgeCheck } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { MessageCircle, Loader2, BadgeCheck, ArrowLeft } from 'lucide-react';
 
 interface ConversationItem {
   profile: Profile;
@@ -16,6 +16,7 @@ interface ConversationItem {
 
 const ChatListPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,13 +56,21 @@ const ChatListPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <MobileLayout>
+    <MobileLayout hideHeader autoHideNav>
       <PullToRefresh onRefresh={load}>
       <div className="page-transition">
-        <div className="px-4 py-4 border-b border-border">
+        <div className="sticky top-0 z-30 flex items-center gap-3 px-2 py-3 bg-background/95 backdrop-blur border-b border-border">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-foreground" />
+          </button>
           <h2 className="text-xl font-bold text-foreground">Messages</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Chat with people you mutually follow</p>
         </div>
+
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
