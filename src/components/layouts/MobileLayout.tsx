@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Video, BookOpen, MessageCircle, User, Bell, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,11 +9,29 @@ import { cn } from '@/lib/utils';
 interface MobileLayoutProps {
   children: React.ReactNode;
   hideNav?: boolean;
+  hideHeader?: boolean; // top header (logo + notification bell) छिपाओ
+  autoHideNav?: boolean; // scroll down पर bottom nav गायब, scroll up पर वापस (YouTube जैसा)
   fullscreen?: boolean; // header + nav दोनों छिपाओ, pure black bg (reels के लिए)
 }
 
-const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, fullscreen = false }) => {
+const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, hideHeader = false, autoHideNav = false, fullscreen = false }) => {
   const location = useLocation();
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    if (!autoHideNav) return;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const delta = y - lastScrollY.current;
+      if (y <= 40) setNavHidden(false);
+      else if (delta > 6) setNavHidden(true);
+      else if (delta < -6) setNavHidden(false);
+      lastScrollY.current = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [autoHideNav]);
   const { profile, user } = useAuth();
   const { t } = useLanguage();
   const unreadNotifications = useUnreadNotifications(user?.id);
@@ -38,6 +56,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
   return (
     <div className="flex flex-col min-h-screen w-full max-w-lg mx-auto bg-background">
       {/* Premium Top Header */}
+      {!hideHeader && (
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 glass-card border-b border-border/40">
         {/* Logo with animated rainbow */}
         <Link to="/home" className="flex items-center gap-2">
@@ -56,6 +75,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
           </Link>
         </div>
       </header>
+      )}
 
       {/* Main Content */}
       <main className={cn('flex-1 overflow-y-auto', !hideNav && 'pb-nav')}>
@@ -64,7 +84,10 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, hideNav = false, 
 
       {/* Premium Bottom Navigation */}
       {!hideNav && (
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 bottom-nav safe-bottom">
+        <nav className={cn(
+          'fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 bottom-nav safe-bottom transition-transform duration-300',
+          navHidden && 'translate-y-full'
+        )}>
           <div className="flex items-center justify-around px-1 py-2">
             {navItems.map(({ path, icon: Icon, label }) => {
               const isActive = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
