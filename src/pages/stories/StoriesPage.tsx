@@ -260,7 +260,7 @@ const StoriesPage: React.FC = () => {
   );
 
   return (
-    <MobileLayout>
+    <MobileLayout autoHideNav>
       <PullToRefresh onRefresh={handleRefresh} disabled={!!viewerUserId}>
       <div className="page-transition">
         {/* Stories row */}
