@@ -87,7 +87,7 @@ const VideosPage: React.FC = () => {
   };
 
   return (
-    <MobileLayout>
+    <MobileLayout autoHideNav>
       <div className="p-4 page-transition">
         {/* Search + voice + upload */}
         <div className="flex items-center gap-2 mb-4">
