@@ -56,7 +56,7 @@ const ChatListPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <MobileLayout hideHeader autoHideNav>
+    <MobileLayout hideHeader hideNav>
       <PullToRefresh onRefresh={load}>
       <div className="page-transition">
         <div className="sticky top-0 z-30 flex items-center gap-3 px-2 py-3 bg-background/95 backdrop-blur border-b border-border">
