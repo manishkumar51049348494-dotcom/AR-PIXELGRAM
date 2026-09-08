@@ -348,6 +348,8 @@ const ReelsPage: React.FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const reelsCountRef = useRef(0);
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollTopRef = useRef(0);
 
   const loadReels = useCallback(async () => {
     try {
@@ -393,6 +395,11 @@ const ReelsPage: React.FC = () => {
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
+    const delta = el.scrollTop - lastScrollTopRef.current;
+    if (el.scrollTop <= 40) setNavHidden(false);
+    else if (delta > 6) setNavHidden(true);
+    else if (delta < -6) setNavHidden(false);
+    lastScrollTopRef.current = el.scrollTop;
     const idx = Math.round(el.scrollTop / el.clientHeight);
     setActiveIndex(prev => (prev === idx ? prev : Math.max(0, Math.min(reelsCountRef.current - 1, idx))));
   }, []);
@@ -474,7 +481,7 @@ const ReelsPage: React.FC = () => {
           );
         })}
       </div>
-      <BottomNav overlay />
+      <BottomNav overlay hidden={navHidden} />
     </div>
   );
 };
