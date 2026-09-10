@@ -133,10 +133,10 @@ const ChatPage: React.FC = () => {
     'Offline';
 
   return (
-    <MobileLayout hideNav>
-      <div className="flex flex-col h-screen">
+    <MobileLayout hideHeader hideNav>
+      <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card sticky top-0 z-10">
+        <div className="z-30 flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-3">
           <button onClick={() => navigate('/chat')} className="p-1 -ml-1 hover:bg-muted rounded-lg transition-colors shrink-0">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
@@ -188,7 +188,7 @@ const ChatPage: React.FC = () => {
 
         {/* Blocked banner */}
         {(blocked || blockedByOther) && (
-          <div className="bg-destructive/10 text-destructive text-sm text-center py-2 px-4">
+          <div className="shrink-0 bg-destructive/10 text-destructive text-sm text-center py-2 px-4">
             {blocked ? `आपने ${otherProfile?.username} को block किया है` : 'आप इस user को message नहीं कर सकते'}
           </div>
         )}
@@ -248,7 +248,7 @@ const ChatPage: React.FC = () => {
 
         {/* Emoji picker */}
         {showEmoji && (
-          <div className="border-t border-border bg-card px-4 py-3">
+          <div className="shrink-0 border-t border-border bg-card px-4 py-3">
             <div className="flex flex-wrap gap-3">
               {EMOJI_LIST.map(emoji => (
                 <button key={emoji} onClick={() => { setContent(p => p + emoji); setShowEmoji(false); }} className="text-2xl hover:scale-125 transition-transform">
@@ -260,7 +260,7 @@ const ChatPage: React.FC = () => {
         )}
 
         {/* Input */}
-        <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3 border-t border-border bg-card" style={{ paddingBottom: 'max(env(safe-area-inset-bottom,0px),12px)' }}>
+        <form onSubmit={handleSend} className="flex shrink-0 items-center gap-2 px-4 py-3 border-t border-border bg-card" style={{ paddingBottom: 'max(env(safe-area-inset-bottom,0px),12px)' }}>
           <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-2 rounded-lg hover:bg-muted transition-colors shrink-0">
             <Smile className={cn('w-5 h-5 transition-colors', showEmoji ? 'text-primary' : 'text-muted-foreground')} />
           </button>
