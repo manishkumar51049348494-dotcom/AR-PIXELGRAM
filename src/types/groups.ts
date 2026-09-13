@@ -51,3 +51,13 @@ export interface GroupMessageReaction {
   reaction: string;
   created_at: string;
 }
+
+export interface GroupMedia {
+  id: string; group_id: string; message_id: string | null; uploader_id: string;
+  media_type: 'photo' | 'video' | 'file' | 'voice'; storage_path: string; public_url: string; file_name: string;
+  mime_type: string | null; file_size: number | null; duration_seconds: number | null; created_at: string;
+}
+
+export interface GroupPinnedMessage {
+  message_id: string; group_id: string; pinned_by: string; pinned_at: string; message: GroupMessage;
+}
