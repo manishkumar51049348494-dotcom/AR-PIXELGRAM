@@ -14,6 +14,7 @@ import ChatListPage from './pages/chat/ChatListPage';
 import ChatPage from './pages/chat/ChatPage';
 import CreateGroupPage from './pages/chat/CreateGroupPage';
 import GroupChatPage from './pages/chat/GroupChatPage';
+import GroupJoinPage from './pages/chat/GroupJoinPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import EditProfilePage from './pages/profile/EditProfilePage';
@@ -72,6 +73,7 @@ export const routes: RouteConfig[] = [
   { name: 'Chat Conversation', path: '/chat/:receiverId', element: <ChatPage /> },
   { name: 'Create Group', path: '/groups/new', element: <CreateGroupPage /> },
   { name: 'Group Chat', path: '/group/:groupId', element: <GroupChatPage /> },
+  { name: 'Join Group', path: '/group/join/:inviteToken', element: <GroupJoinPage /> },
   { name: 'Notifications', path: '/notifications', element: <NotificationsPage /> },
   { name: 'Profile', path: '/profile', element: <ProfilePage /> },
   { name: 'User Profile', path: '/profile/:userId', element: <ProfilePage /> },
