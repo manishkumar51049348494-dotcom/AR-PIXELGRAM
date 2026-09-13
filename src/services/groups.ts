@@ -1,6 +1,6 @@
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
-import type { Group, GroupMember, GroupMessage, GroupMessageReaction, GroupRole, GroupSummary } from '@/types/groups';
+import type { Group, GroupMember, GroupMedia, GroupMessage, GroupMessageReaction, GroupPinnedMessage, GroupRole, GroupSummary } from '@/types/groups';
 
 interface GroupMemberRow extends GroupMember { profile?: Profile | null }
 
@@ -78,6 +78,23 @@ export async function getGroupMessages(groupId: string): Promise<GroupMessage[]>
     ...message,
     reactions: message.group_message_reactions || [],
   }));
+}
+
+export async function getGroupMedia(groupId: string): Promise<GroupMedia[]> {
+  const { data, error } = await supabase.from('group_media').select('*').eq('group_id', groupId).order('created_at', { ascending: false }).limit(100);
+  throwIfError(error);
+  return (data || []) as GroupMedia[];
+}
+
+export async function getGroupPinnedMessages(groupId: string): Promise<GroupPinnedMessage[]> {
+  const { data: pins, error: pinError } = await supabase.from('group_message_pins').select('*').eq('group_id', groupId).order('pinned_at', { ascending: false });
+  throwIfError(pinError);
+  const rows = (pins || []) as Array<Omit<GroupPinnedMessage, 'message'>>;
+  if (!rows.length) return [];
+  const { data: messages, error: messageError } = await supabase.from('group_messages').select('*, group_message_reactions(*)').in('id', rows.map(pin => pin.message_id)).is('deleted_at', null);
+  throwIfError(messageError);
+  const messageMap = new Map((messages || []).map(raw => { const message = raw as GroupMessage & { group_message_reactions?: GroupMessageReaction[] }; return [message.id, { ...message, reactions: message.group_message_reactions || [] } as GroupMessage]; }));
+  return rows.flatMap(pin => { const message = messageMap.get(pin.message_id); return message ? [{ ...pin, message }] : []; });
 }
 
 export async function sendGroupMessage(groupId: string, content: string, replyToId?: string | null): Promise<GroupMessage> {
