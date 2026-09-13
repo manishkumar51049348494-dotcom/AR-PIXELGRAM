@@ -163,3 +163,10 @@ export async function searchGroupUsers(query: string, existingIds: string[]): Pr
   throwIfError(error);
   return ((data || []) as Profile[]).filter(profile => !existingIds.includes(profile.user_id));
 }
+
+export async function joinGroupByInvite(token: string): Promise<string> {
+  const { data, error } = await supabase.rpc('join_group_by_invite', { p_token: token });
+  throwIfError(error);
+  if (!data) throw new Error('Invite link is invalid');
+  return data as string;
+}
