@@ -29,6 +29,8 @@ const GroupChatPage: React.FC = () => {
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [mediaItems, setMediaItems] = useState<GroupMedia[]>([]);
   const [pinnedMessages, setPinnedMessages] = useState<GroupPinnedMessage[]>([]);
+  const [messageQuery, setMessageQuery] = useState('');
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [content, setContent] = useState('');
   const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,16 +46,16 @@ const GroupChatPage: React.FC = () => {
   const currentMember = useMemo(() => members.find(member => member.user_id === user?.id), [members, user]);
   const canManage = currentMember?.role === 'owner' || currentMember?.role === 'admin';
   const profileMap = useMemo(() => new Map(members.map(member => [member.user_id, member.profile])), [members]);
+  const visibleMessages = useMemo(() => { const query = messageQuery.trim().toLowerCase(); if (!query) return messages; return messages.filter(message => message.content.toLowerCase().includes(query) || (profileMap.get(message.sender_id)?.username || '').toLowerCase().includes(query)); }, [messageQuery, messages, profileMap]);
 
   const load = useCallback(async () => {
     if (!groupId) return;
     try {
-      const [nextGroup, nextMembers, nextMessages, nextMedia, nextPinned] = await Promise.all([getGroup(groupId), getGroupMembers(groupId), getGroupMessages(groupId), getGroupMedia(groupId), getGroupPinnedMessages(groupId)]);
+      const [nextGroup, nextMembers, nextMessages] = await Promise.all([getGroup(groupId), getGroupMembers(groupId), getGroupMessages(groupId)]);
       setGroup(nextGroup);
       setMembers(nextMembers);
       setMessages(nextMessages);
-      setMediaItems(nextMedia);
-      setPinnedMessages(nextPinned);
+      try { const [nextMedia, nextPinned] = await Promise.all([getGroupMedia(groupId), getGroupPinnedMessages(groupId)]); setMediaItems(nextMedia); setPinnedMessages(nextPinned); } catch { setMediaItems([]); setPinnedMessages([]); }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Group load nahi hua');
     } finally { setLoading(false); }
@@ -153,13 +155,13 @@ const GroupChatPage: React.FC = () => {
         <header className="z-20 flex shrink-0 items-center gap-2 border-b border-border bg-card/95 px-2 py-2 backdrop-blur">
           <button type="button" onClick={() => navigate('/chat')} className="rounded-full p-2 hover:bg-muted" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
           <button type="button" onClick={() => setShowInfo(true)} className="flex min-w-0 flex-1 items-center gap-2 text-left"><Avatar profile={group.avatar_url ? { avatar_url: group.avatar_url, username: group.name } as Profile : null} /><span className="min-w-0"><span className="block truncate text-sm font-semibold">{group.name}</span><span className="block truncate text-xs text-muted-foreground">{members.length} members</span></span></button>
-          <button type="button" onClick={() => setShowInfo(true)} className="rounded-full p-2 hover:bg-muted" aria-label="Group info"><MoreVertical className="h-5 w-5" /></button>
+          <button type="button" onClick={() => setShowMessageSearch(value => !value)} className="rounded-full p-2 hover:bg-muted" aria-label="Search messages"><Search className="h-5 w-5" /></button><button type="button" onClick={() => setShowInfo(true)} className="rounded-full p-2 hover:bg-muted" aria-label="Group info"><MoreVertical className="h-5 w-5" /></button>
         </header>
         <GroupCallPanel groupId={group.id} />
 
         <div className="flex-1 min-h-0 space-y-2 overflow-y-auto p-3">
           <div className="mx-auto max-w-sm rounded-xl bg-primary/8 px-3 py-2 text-center text-xs text-muted-foreground">Messages in this group are visible only to its members.</div>
-          {messages.map(message => {
+          {visibleMessages.map(message => {
             const mine = message.sender_id === user?.id;
             const sender = profileMap.get(message.sender_id);
             const replied = message.reply_to_id ? messages.find(item => item.id === message.reply_to_id) : null;
