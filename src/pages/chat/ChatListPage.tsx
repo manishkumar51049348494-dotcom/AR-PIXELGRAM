@@ -74,10 +74,10 @@ const ChatListPage: React.FC = () => {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <h2 className="text-xl font-bold text-foreground">Messages</h2>
-          <button type="button" onClick={() => setShowGroupMenu(value => !value)} aria-label="Create group" className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"><Plus className="h-4 w-4" /></button>
+
         </div>
 
-        {showGroupMenu && <div className="border-b border-border bg-card px-4 py-2"><Link to="/groups/new" onClick={() => setShowGroupMenu(false)} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-primary hover:bg-muted"><Users className="h-4 w-4" />Create group</Link></div>}
+
         {groups.length > 0 && <div className="border-b border-border">{groups.map(({ group, member_count }) => <Link key={group.id} to={'/group/' + group.id} className="flex items-center gap-3 border-b border-border/50 px-4 py-3 hover:bg-muted/60">{group.avatar_url ? <img src={group.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary"><Users className="h-5 w-5" /></div>}<div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{member_count} members</p></div></Link>)}</div>}
 
         {loading ? (
@@ -134,6 +134,7 @@ const ChatListPage: React.FC = () => {
             ))}
           </div>
         )}
+        <div className="fixed bottom-6 right-4 z-40"><button type="button" onClick={() => setShowGroupMenu(value => !value)} aria-label="Create group" className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background hover:bg-primary/90"><Plus className="h-5 w-5" /></button>{showGroupMenu && <div className="absolute bottom-14 right-0 w-44 rounded-xl border border-border bg-card p-1 shadow-xl"><Link to="/groups/new" onClick={() => setShowGroupMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted"><Users className="h-4 w-4" />Create group</Link></div>}</div>
       </div>
       </PullToRefresh>
     </MobileLayout>
