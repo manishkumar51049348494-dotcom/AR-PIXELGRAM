@@ -1,6 +1,6 @@
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
-import type { Group, GroupMember, GroupMedia, GroupMessage, GroupMessageReaction, GroupPinnedMessage, GroupRole, GroupSummary } from '@/types/groups';
+import type { Group, GroupMember, GroupMedia, GroupMessage, GroupMessageReaction, GroupPinnedMessage, GroupPermissions, GroupRole, GroupSummary } from '@/types/groups';
 
 interface GroupMemberRow extends GroupMember { profile?: Profile | null }
 
@@ -78,6 +78,17 @@ export async function getGroupMessages(groupId: string): Promise<GroupMessage[]>
     ...message,
     reactions: message.group_message_reactions || [],
   }));
+}
+
+export async function getGroupPermissions(groupId: string): Promise<GroupPermissions | null> {
+  const { data, error } = await supabase.from('group_permissions').select('*').eq('group_id', groupId).maybeSingle();
+  throwIfError(error);
+  return data as GroupPermissions | null;
+}
+
+export async function updateGroupPermissions(groupId: string, updates: Partial<Omit<GroupPermissions, 'group_id' | 'updated_at'>>): Promise<void> {
+  const { error } = await supabase.from('group_permissions').update({ ...updates, updated_at: new Date().toISOString() }).eq('group_id', groupId);
+  throwIfError(error);
 }
 
 export async function getGroupMedia(groupId: string): Promise<GroupMedia[]> {
