@@ -61,3 +61,16 @@ export interface GroupMedia {
 export interface GroupPinnedMessage {
   message_id: string; group_id: string; pinned_by: string; pinned_at: string; message: GroupMessage;
 }
+
+export type GroupPermissionMode = 'everyone' | 'admins';
+
+export interface GroupPermissions {
+  group_id: string;
+  send_messages: GroupPermissionMode;
+  add_members: GroupPermissionMode;
+  edit_info: GroupPermissionMode;
+  create_invites: GroupPermissionMode;
+  pin_messages: GroupPermissionMode;
+  start_calls: GroupPermissionMode;
+  updated_at: string;
+}
