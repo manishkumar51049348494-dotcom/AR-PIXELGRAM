@@ -4,9 +4,10 @@ import PullToRefresh from '@/components/common/PullToRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { withTimeout } from '@/lib/withTimeout';
 import { getMutualFollows, getMessages, getUnreadCount, getMessagedProfiles } from '@/services/api';
+import { getMyGroups } from '@/services/groups';
 import type { Profile, Message } from '@/types/types';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle, Loader2, BadgeCheck, ArrowLeft } from 'lucide-react';
+import { MessageCircle, Loader2, BadgeCheck, ArrowLeft, Plus, Users } from 'lucide-react';
 
 interface ConversationItem {
   profile: Profile;
@@ -19,15 +20,19 @@ const ChatListPage: React.FC = () => {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState<Awaited<ReturnType<typeof getMyGroups>>>([]);
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
     {
       try {
-        const [mutuals, messaged] = await withTimeout(Promise.all([
+        const [mutuals, messaged, groupList] = await withTimeout(Promise.all([
           getMutualFollows(user.id),
           getMessagedProfiles(user.id),
+          getMyGroups(user.id),
         ]), 20000);
+        setGroups(groupList);
         const seen = new Set<string>();
         const combined: Profile[] = [];
         for (const p of [...mutuals, ...messaged]) {
@@ -69,14 +74,17 @@ const ChatListPage: React.FC = () => {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <h2 className="text-xl font-bold text-foreground">Messages</h2>
+          <button type="button" onClick={() => setShowGroupMenu(value => !value)} aria-label="Create group" className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"><Plus className="h-4 w-4" /></button>
         </div>
 
+        {showGroupMenu && <div className="border-b border-border bg-card px-4 py-2"><Link to="/groups/new" onClick={() => setShowGroupMenu(false)} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-primary hover:bg-muted"><Users className="h-4 w-4" />Create group</Link></div>}
+        {groups.length > 0 && <div className="border-b border-border">{groups.map(({ group, member_count }) => <Link key={group.id} to={'/group/' + group.id} className="flex items-center gap-3 border-b border-border/50 px-4 py-3 hover:bg-muted/60">{group.avatar_url ? <img src={group.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary"><Users className="h-5 w-5" /></div>}<div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{member_count} members</p></div></Link>)}</div>}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : conversations.length === 0 ? (
+        ) : conversations.length === 0 && groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-6">
             <MessageCircle className="w-16 h-16 text-muted-foreground mb-3" />
             <h3 className="font-semibold text-foreground mb-1">No messages yet</h3>
