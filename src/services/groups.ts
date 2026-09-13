@@ -170,3 +170,45 @@ export async function joinGroupByInvite(token: string): Promise<string> {
   if (!data) throw new Error('Invite link is invalid');
   return data as string;
 }
+
+export async function sendGroupFileMessage(groupId: string, file: File): Promise<GroupMessage> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Not authenticated');
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = groupId + '/' + auth.user.id + '/' + crypto.randomUUID() + '-' + safeName;
+  const { error: uploadError } = await supabase.storage.from('group-media').upload(storagePath, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+  throwIfError(uploadError);
+  const { data: urlData } = supabase.storage.from('group-media').getPublicUrl(storagePath);
+  const mediaType = file.type.startsWith('image/') ? 'photo' : file.type.startsWith('video/') ? 'video' : 'file';
+  const { data: message, error: messageError } = await supabase.from('group_messages').insert({ group_id: groupId, content: '📎 ' + file.name + '\n' + urlData.publicUrl }).select('*').single();
+  throwIfError(messageError);
+  const { error: mediaError } = await supabase.from('group_media').insert({ group_id: groupId, message_id: message.id, uploader_id: auth.user.id, media_type: mediaType, storage_path: storagePath, public_url: urlData.publicUrl, file_name: file.name, mime_type: file.type || null, file_size: file.size });
+  throwIfError(mediaError);
+  return message as GroupMessage;
+}
+
+export async function createGroupCall(groupId: string, kind: 'audio' | 'video'): Promise<string> {
+  const { data, error } = await supabase.from('group_calls').insert({ group_id: groupId, started_by: (await supabase.auth.getUser()).data.user?.id, kind }).select('id').single();
+  throwIfError(error);
+  if (!data?.id) throw new Error('Call could not be started');
+  return data.id as string;
+}
+
+export async function joinGroupCall(callId: string): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Not authenticated');
+  const { error } = await supabase.from('group_call_participants').upsert({ call_id: callId, user_id: auth.user.id, left_at: null });
+  throwIfError(error);
+}
+
+export async function leaveGroupCall(callId: string): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Not authenticated');
+  const { error } = await supabase.from('group_call_participants').update({ left_at: new Date().toISOString() }).eq('call_id', callId).eq('user_id', auth.user.id);
+  throwIfError(error);
+}
+
+export async function endGroupCall(callId: string): Promise<void> {
+  const { error } = await supabase.from('group_calls').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', callId);
+  throwIfError(error);
+}
