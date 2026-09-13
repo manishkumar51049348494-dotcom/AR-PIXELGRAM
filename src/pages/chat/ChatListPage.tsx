@@ -30,7 +30,7 @@ const ChatListPage: React.FC = () => {
         const [mutuals, messaged, groupList] = await withTimeout(Promise.all([
           getMutualFollows(user.id),
           getMessagedProfiles(user.id),
-          getMyGroups(user.id),
+          getMyGroups(user.id).catch(() => []),
         ]), 20000);
         setGroups(groupList);
         const seen = new Set<string>();
