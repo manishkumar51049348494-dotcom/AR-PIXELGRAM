@@ -35,7 +35,7 @@ const GroupChatPage: React.FC = () => {
   const [memberResults, setMemberResults] = useState<Profile[]>([]);
   const [reactionMessage, setReactionMessage] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const selectedUserIds = ((location.state as { selectedUserIds?: string[] } | null)?.selectedUserIds || []);
+  const selectedUserIds = useMemo(() => ((location.state as { selectedUserIds?: string[] } | null)?.selectedUserIds || []), [location.state]);
 
   const currentMember = useMemo(() => members.find(member => member.user_id === user?.id), [members, user]);
   const canManage = currentMember?.role === 'owner' || currentMember?.role === 'admin';
